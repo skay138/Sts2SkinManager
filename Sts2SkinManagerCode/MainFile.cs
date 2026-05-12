@@ -49,15 +49,22 @@ public partial class MainFile : Node
         Directory.CreateDirectory(managerDataDir);
 
         var detected = SkinModScanner.Scan(modsDir);
-        Logger.Info($"detected {detected.Count} skin variant pck(s):");
-        foreach (var d in detected)
+        var characterMods = detected.Where(d => d.Kind == SkinModKind.Character).ToList();
+        var cardMods = detected.Where(d => d.Kind == SkinModKind.Cards).ToList();
+
+        Logger.Info($"detected {characterMods.Count} character skin pck(s), {cardMods.Count} card pack pck(s):");
+        foreach (var d in characterMods)
         {
             ManagedPckRegistry.Manage(d.PckPath);
-            Logger.Info($"  - {d.ModId} → [{string.Join(",", d.Characters)}] @ {d.PckPath}");
+            Logger.Info($"  [char] {d.ModId} → [{string.Join(",", d.Characters)}]");
+        }
+        foreach (var d in cardMods)
+        {
+            Logger.Info($"  [cards] {d.ModId}");
         }
 
         var byCharacter = new Dictionary<string, List<DetectedSkinMod>>();
-        foreach (var d in detected)
+        foreach (var d in characterMods)
         {
             foreach (var c in d.Characters)
             {
@@ -78,8 +85,7 @@ public partial class MainFile : Node
         if (fileReordered || memoryReordered)
         {
             Logger.Warn($"self-bootstrap: file_reorder={fileReordered} memory_reorder={memoryReordered}. " +
-                        "*** RESTART STS2 ONCE *** for full activation " +
-                        "(this boot still has pre-mounted variant pcks).");
+                        "*** RESTART STS2 ONCE *** for full activation.");
         }
 
         var choicesPath = Path.Combine(managerDataDir, "skin_choices.json");
@@ -88,8 +94,10 @@ public partial class MainFile : Node
         {
             choices.SyncAvailableVariants(character, variants.Select(v => v.ModId));
         }
+        choices.SyncCardPacks(cardMods.Select(c => c.ModId));
         choices.Save(choicesPath);
         Logger.Info($"skin_choices.json → {choicesPath}");
+        Logger.Info($"card pack state: ordering=[{string.Join(", ", choices.CardPacks.Ordering)}], enabled={{ {string.Join(", ", choices.CardPacks.Enabled.Select(kv => $"{kv.Key}={kv.Value}"))} }}");
 
         foreach (var (character, variants) in byCharacter)
         {
@@ -105,10 +113,21 @@ public partial class MainFile : Node
             RuntimeMountService.MountVariantPck(variant.PckPath);
         }
 
-        _watcher = new ChoicesFileWatcher(choicesPath, managerDataDir, byCharacter, choices);
+        if (settings != null && cardMods.Count > 0)
+        {
+            var settingsChanged = CardPackApplier.ApplyToSettings(settings, choices.CardPacks, cardMods);
+            var memoryChanged = CardPackApplier.ApplyToMemoryModList(choices.CardPacks);
+            if (settingsChanged)
+            {
+                Sts2SettingsWriter.Save(settings);
+                Logger.Info($"card pack settings.save updated (mem={memoryChanged}); takes full effect on next restart");
+            }
+        }
+
+        _watcher = new ChoicesFileWatcher(choicesPath, managerDataDir, byCharacter, cardMods, choices);
         _watcher.Start();
 
-        SkinSelectorOverlay.Configure(choicesPath, byCharacter);
+        SkinSelectorOverlay.Configure(choicesPath, byCharacter, cardMods);
     }
 
     private static ChoicesFileWatcher? _watcher;

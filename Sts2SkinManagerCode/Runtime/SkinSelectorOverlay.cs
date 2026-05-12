@@ -13,18 +13,25 @@ public static class SkinSelectorOverlay
 {
     private static string _choicesPath = "";
     private static Dictionary<string, List<DetectedSkinMod>>? _byCharacter;
+    private static List<DetectedSkinMod> _cardMods = new();
+
     private static OptionButton? _opt;
     private static Label? _label;
     private static Control? _hbox;
+    private static VBoxContainer? _cardPackVBox;
+    private static Label? _cardPackHeader;
+
     private static Node? _lastScreen;
     private static string _currentCharacter = "";
     private static bool _suppressNextItemSelected;
     private static bool _localeChangeSubscribed;
+    private static bool _alreadyHandledThisEvent;
 
-    public static void Configure(string choicesPath, Dictionary<string, List<DetectedSkinMod>> byCharacter)
+    public static void Configure(string choicesPath, Dictionary<string, List<DetectedSkinMod>> byCharacter, List<DetectedSkinMod> cardMods)
     {
         _choicesPath = choicesPath;
         _byCharacter = byCharacter;
+        _cardMods = cardMods;
     }
 
     public static void Attach(Node screen)
@@ -55,10 +62,7 @@ public static class SkinSelectorOverlay
                 CustomMinimumSize = new Vector2(80, 56),
                 VerticalAlignment = VerticalAlignment.Center,
             };
-            _opt = new OptionButton
-            {
-                CustomMinimumSize = new Vector2(320, 56),
-            };
+            _opt = new OptionButton { CustomMinimumSize = new Vector2(320, 56) };
             _opt.ItemSelected += OnVariantSelected;
             _opt.Connect("item_selected", Callable.From<long>(idx => OnVariantSelectedSafe(idx)));
             _opt.Pressed += () => MainFile.Logger.Info("OptionButton pressed (dropdown opened)");
@@ -68,12 +72,142 @@ public static class SkinSelectorOverlay
             screen.AddChild(hbox);
             MainFile.Logger.Info($"SkinSelectorOverlay attached (OptionButton) to {screen.Name}");
             RefreshItems();
+
+            if (_cardMods.Count > 0) BuildCardPackPanel(screen);
+
             EnsureLocaleSubscribed();
         }
         catch (Exception ex)
         {
             MainFile.Logger.Warn($"overlay attach failed: {ex.Message}");
         }
+    }
+
+    private static void BuildCardPackPanel(Node screen)
+    {
+        var vbox = new VBoxContainer
+        {
+            Position = new Vector2(40, 110),
+            CustomMinimumSize = new Vector2(480, 80),
+        };
+        _cardPackVBox = vbox;
+
+        var header = new Label
+        {
+            Text = Strings.Get("card_packs_header") + ":",
+            CustomMinimumSize = new Vector2(420, 28),
+        };
+        _cardPackHeader = header;
+        vbox.AddChild(header);
+
+        BuildCardPackRows();
+
+        vbox.ZIndex = 1000;
+        screen.AddChild(vbox);
+        MainFile.Logger.Info($"card pack panel attached ({_cardMods.Count} packs)");
+    }
+
+    private static void BuildCardPackRows()
+    {
+        if (_cardPackVBox == null || !GodotObject.IsInstanceValid(_cardPackVBox)) return;
+
+        for (var i = _cardPackVBox.GetChildCount() - 1; i >= 1; i--)
+        {
+            var child = _cardPackVBox.GetChild(i);
+            _cardPackVBox.RemoveChild(child);
+            child.QueueFree();
+        }
+
+        var choices = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
+        if (_cardPackHeader != null) _cardPackHeader.Text = Strings.Get("card_packs_header") + ":";
+
+        for (var i = 0; i < choices.CardPacks.Ordering.Count; i++)
+        {
+            var modId = choices.CardPacks.Ordering[i];
+            var row = BuildCardPackRow(modId, choices.CardPacks, i, choices.CardPacks.Ordering.Count);
+            _cardPackVBox.AddChild(row);
+        }
+    }
+
+    private static Control BuildCardPackRow(string modId, CardPacksConfig packs, int index, int total)
+    {
+        var hbox = new HBoxContainer();
+        var enabled = packs.Enabled.TryGetValue(modId, out var e) ? e : true;
+
+        var check = new CheckBox
+        {
+            ButtonPressed = enabled,
+            CustomMinimumSize = new Vector2(32, 32),
+        };
+        check.Toggled += isOn => OnCardPackToggle(modId, isOn);
+        hbox.AddChild(check);
+
+        var label = new Label
+        {
+            Text = modId,
+            CustomMinimumSize = new Vector2(340, 32),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        hbox.AddChild(label);
+
+        var upBtn = new Button
+        {
+            Text = "↑",
+            CustomMinimumSize = new Vector2(32, 32),
+            Disabled = index == 0,
+        };
+        upBtn.Pressed += () => MoveCardPack(modId, -1);
+        hbox.AddChild(upBtn);
+
+        var downBtn = new Button
+        {
+            Text = "↓",
+            CustomMinimumSize = new Vector2(32, 32),
+            Disabled = index == total - 1,
+        };
+        downBtn.Pressed += () => MoveCardPack(modId, +1);
+        hbox.AddChild(downBtn);
+
+        return hbox;
+    }
+
+    private static void OnCardPackToggle(string modId, bool isOn)
+    {
+        try
+        {
+            var choices = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
+            var current = choices.CardPacks.Enabled.TryGetValue(modId, out var c) ? c : true;
+            if (current == isOn) return;
+            choices.CardPacks.Enabled[modId] = isOn;
+            choices.Save(_choicesPath);
+            MainFile.Logger.Info($"card pack toggle: {modId} → {isOn}");
+        }
+        catch (Exception ex) { MainFile.Logger.Warn($"card pack toggle error: {ex.Message}"); }
+    }
+
+    private static void MoveCardPack(string modId, int delta)
+    {
+        try
+        {
+            var choices = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
+            var idx = choices.CardPacks.Ordering.IndexOf(modId);
+            if (idx < 0) return;
+            var newIdx = idx + delta;
+            if (newIdx < 0 || newIdx >= choices.CardPacks.Ordering.Count) return;
+
+            var item = choices.CardPacks.Ordering[idx];
+            choices.CardPacks.Ordering.RemoveAt(idx);
+            choices.CardPacks.Ordering.Insert(newIdx, item);
+            choices.Save(_choicesPath);
+            MainFile.Logger.Info($"card pack reorder: {modId} moved to index {newIdx}");
+            Callable.From(BuildCardPackRows).CallDeferred();
+        }
+        catch (Exception ex) { MainFile.Logger.Warn($"card pack reorder error: {ex.Message}"); }
+    }
+
+    public static void RefreshCardPacks()
+    {
+        Callable.From(BuildCardPackRows).CallDeferred();
     }
 
     private static void EnsureLocaleSubscribed()
@@ -101,12 +235,17 @@ public static class SkinSelectorOverlay
                 MainFile.Logger.Info($"locale changed → reconciling overlay (was attached to '{_lastScreen?.Name}')");
                 if (_hbox != null && GodotObject.IsInstanceValid(_hbox) && _hbox.IsInsideTree())
                 {
-                    MainFile.Logger.Info("overlay still in tree; refreshing label/items");
+                    MainFile.Logger.Info("overlay still in tree; refreshing label/items + card pack panel");
                     if (_label != null && GodotObject.IsInstanceValid(_label))
                     {
                         _label.Text = Strings.Get("skin_label") + ":";
                     }
                     RefreshItems();
+                    if (_cardPackHeader != null && GodotObject.IsInstanceValid(_cardPackHeader))
+                    {
+                        _cardPackHeader.Text = Strings.Get("card_packs_header") + ":";
+                    }
+                    BuildCardPackRows();
                     return;
                 }
 
@@ -114,17 +253,13 @@ public static class SkinSelectorOverlay
                 _opt = null;
                 _label = null;
                 _hbox = null;
+                _cardPackVBox = null;
+                _cardPackHeader = null;
                 var mainLoop = Engine.GetMainLoop();
                 if (mainLoop is not SceneTree tree) return;
                 var screen = FindCharacterSelectScreen(tree.Root);
-                if (screen != null)
-                {
-                    DoAttach(screen);
-                }
-                else
-                {
-                    MainFile.Logger.Info("no CharacterSelectScreen in tree currently; will re-attach when user navigates back");
-                }
+                if (screen != null) DoAttach(screen);
+                else MainFile.Logger.Info("no CharacterSelectScreen in tree currently; will re-attach when user navigates back");
             }
             catch (Exception ex)
             {
@@ -195,8 +330,6 @@ public static class SkinSelectorOverlay
             _suppressNextItemSelected = false;
         }
     }
-
-    private static bool _alreadyHandledThisEvent;
 
     private static void OnVariantSelected(long index)
     {

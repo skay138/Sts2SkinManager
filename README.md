@@ -15,6 +15,7 @@ A Slay the Spire 2 mod that lets you switch between character skin mods at runti
 - **Auto-restart via Steam** — when you confirm, the mod spawns a helper that waits for STS2 to exit, then relaunches it through `steam://run/2868840`. New session boots with the chosen variant pre-mounted.
 - **Cancel → revert** — if you click "Restart later", your selection is rolled back so re-picking the same option triggers the modal again.
 - **Multi-language** — UI strings follow the game's current language. Supported: English, Korean, Japanese, Simplified/Traditional Chinese, German, French, Spanish (Castellano/Latam), Italian, Portuguese (BR/PT), Polish, Russian, Thai, Turkish. Unsupported languages fall back to English.
+- **Card pack management (v0.2.0+)** — detects card art mods (`.pck` overriding `card_art/MegaCrit.Sts2.Core.Models.Cards.*` or shipping `card_portraits/`), shows them in a separate panel on Character Select with checkboxes (enable/disable) and ↑/↓ arrows (priority). Multiple packs can be active simultaneously; the one lower in the list wins for overlapping cards (last-mounted-wins). Toggle/reorder writes to STS2's `settings.save` and triggers the same restart modal as character-skin changes.
 
 ## How it works
 

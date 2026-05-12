@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
 namespace Sts2SkinManager.Config;
@@ -15,14 +17,25 @@ public class CharacterSkinChoice
     public List<string> AvailableVariants { get; set; } = new();
 }
 
+public class CardPacksConfig
+{
+    [JsonPropertyName("ordering")]
+    public List<string> Ordering { get; set; } = new();
+
+    [JsonPropertyName("enabled")]
+    public Dictionary<string, bool> Enabled { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+}
+
 public class SkinChoicesConfig
 {
-    public Dictionary<string, CharacterSkinChoice> Characters { get; set; } = new();
+    public Dictionary<string, CharacterSkinChoice> Characters { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public CardPacksConfig CardPacks { get; set; } = new();
 
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         WriteIndented = true,
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
     public static SkinChoicesConfig LoadOrEmpty(string path)
@@ -31,8 +44,18 @@ public class SkinChoicesConfig
         try
         {
             var json = File.ReadAllText(path);
-            var dict = JsonSerializer.Deserialize<Dictionary<string, CharacterSkinChoice>>(json, JsonOpts);
-            return new SkinChoicesConfig { Characters = dict ?? new() };
+            if (JsonNode.Parse(json) is not JsonObject root) return new SkinChoicesConfig();
+
+            var cfg = new SkinChoicesConfig();
+
+            if (root.TryGetPropertyValue("_card_packs", out var cardPacksNode) && cardPacksNode != null)
+            {
+                cfg.CardPacks = JsonSerializer.Deserialize<CardPacksConfig>(cardPacksNode.ToJsonString(), JsonOpts) ?? new CardPacksConfig();
+                root.Remove("_card_packs");
+            }
+
+            cfg.Characters = JsonSerializer.Deserialize<Dictionary<string, CharacterSkinChoice>>(root.ToJsonString(), JsonOpts) ?? new(StringComparer.OrdinalIgnoreCase);
+            return cfg;
         }
         catch
         {
@@ -44,8 +67,17 @@ public class SkinChoicesConfig
     {
         var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-        var json = JsonSerializer.Serialize(Characters, JsonOpts);
-        File.WriteAllText(path, json);
+
+        var root = new JsonObject();
+        foreach (var (key, value) in Characters)
+        {
+            var node = JsonNode.Parse(JsonSerializer.Serialize(value, JsonOpts));
+            if (node != null) root[key] = node;
+        }
+        var cardPacksNode = JsonNode.Parse(JsonSerializer.Serialize(CardPacks, JsonOpts));
+        if (cardPacksNode != null) root["_card_packs"] = cardPacksNode;
+
+        File.WriteAllText(path, root.ToJsonString(JsonOpts));
     }
 
     public void SyncAvailableVariants(string character, IEnumerable<string> variants)
@@ -62,5 +94,30 @@ public class SkinChoicesConfig
         {
             choice.Active = "default";
         }
+    }
+
+    public void SyncCardPacks(IEnumerable<string> detectedModIds)
+    {
+        var detected = detectedModIds.ToList();
+        var detectedSet = new HashSet<string>(detected, StringComparer.OrdinalIgnoreCase);
+
+        var newOrdering = new List<string>();
+        foreach (var modId in CardPacks.Ordering)
+        {
+            if (detectedSet.Contains(modId) && !newOrdering.Contains(modId, StringComparer.OrdinalIgnoreCase))
+                newOrdering.Add(modId);
+        }
+        foreach (var modId in detected.OrderBy(m => m, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!newOrdering.Contains(modId, StringComparer.OrdinalIgnoreCase)) newOrdering.Add(modId);
+        }
+        CardPacks.Ordering = newOrdering;
+
+        foreach (var modId in detected)
+        {
+            if (!CardPacks.Enabled.ContainsKey(modId)) CardPacks.Enabled[modId] = true;
+        }
+        var stale = CardPacks.Enabled.Keys.Where(k => !detectedSet.Contains(k)).ToList();
+        foreach (var s in stale) CardPacks.Enabled.Remove(s);
     }
 }

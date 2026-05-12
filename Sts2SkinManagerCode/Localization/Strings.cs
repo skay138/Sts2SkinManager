@@ -38,6 +38,7 @@ public static class Strings
             ["modal_body"] = "To change the skin, STS2 must restart.\nChoose: restart now, or cancel the change.\n\nAuto-restart in {0}s via Steam.",
             ["btn_restart_now"] = "Restart now",
             ["btn_restart_later"] = "Restart later",
+            ["card_packs_header"] = "Card packs",
         },
         ["KOR"] = new()
         {
@@ -48,6 +49,7 @@ public static class Strings
             ["modal_body"] = "스킨을 변경하려면 게임을 재시작해야 해요.\n즉시 재시작할지 변경을 취소할지 선택해주세요.\n\n{0}초 뒤 자동으로 재시작됩니다.",
             ["btn_restart_now"] = "지금 재시작",
             ["btn_restart_later"] = "나중에 재시작",
+            ["card_packs_header"] = "카드팩",
         },
         ["JPN"] = new()
         {
@@ -58,6 +60,7 @@ public static class Strings
             ["modal_body"] = "スキンを変更するにはSTS2の再起動が必要です。\nすぐに再起動するか、変更を取り消すか選んでください。\n\n{0}秒後にSteamで自動再起動します。",
             ["btn_restart_now"] = "今すぐ再起動",
             ["btn_restart_later"] = "後で再起動",
+            ["card_packs_header"] = "カードパック",
         },
         ["ZHS"] = new()
         {
@@ -68,6 +71,7 @@ public static class Strings
             ["modal_body"] = "要更换皮肤,需要重启 STS2。\n请选择立即重启或取消更改。\n\n将在 {0} 秒后通过 Steam 自动重启。",
             ["btn_restart_now"] = "立即重启",
             ["btn_restart_later"] = "稍后重启",
+            ["card_packs_header"] = "卡牌包",
         },
         ["ZHT"] = new()
         {
@@ -78,6 +82,7 @@ public static class Strings
             ["modal_body"] = "要更換皮膚,需要重啟 STS2。\n請選擇立即重啟或取消變更。\n\n將在 {0} 秒後透過 Steam 自動重啟。",
             ["btn_restart_now"] = "立即重啟",
             ["btn_restart_later"] = "稍後重啟",
+            ["card_packs_header"] = "卡牌包",
         },
         ["DEU"] = new()
         {
@@ -88,6 +93,7 @@ public static class Strings
             ["modal_body"] = "Um den Skin zu ändern, muss STS2 neu starten.\nWähle: jetzt neu starten oder Änderung abbrechen.\n\nAutomatischer Neustart in {0}s über Steam.",
             ["btn_restart_now"] = "Jetzt neu starten",
             ["btn_restart_later"] = "Später neu starten",
+            ["card_packs_header"] = "Karten-Packs",
         },
         ["FRA"] = new()
         {
@@ -98,6 +104,7 @@ public static class Strings
             ["modal_body"] = "Pour changer de skin, STS2 doit redémarrer.\nChoisissez : redémarrer maintenant ou annuler le changement.\n\nRedémarrage automatique dans {0}s via Steam.",
             ["btn_restart_now"] = "Redémarrer maintenant",
             ["btn_restart_later"] = "Redémarrer plus tard",
+            ["card_packs_header"] = "Packs de cartes",
         },
         ["SPA"] = new()
         {
@@ -108,6 +115,7 @@ public static class Strings
             ["modal_body"] = "Para cambiar el skin, STS2 debe reiniciarse.\nElige: reiniciar ahora o cancelar el cambio.\n\nReinicio automático en {0}s vía Steam.",
             ["btn_restart_now"] = "Reiniciar ahora",
             ["btn_restart_later"] = "Reiniciar después",
+            ["card_packs_header"] = "Paquetes de cartas",
         },
         ["ESP"] = new()
         {
@@ -118,6 +126,7 @@ public static class Strings
             ["modal_body"] = "Para cambiar el skin, STS2 debe reiniciarse.\nElige: reiniciar ahora o cancelar el cambio.\n\nReinicio automático en {0}s vía Steam.",
             ["btn_restart_now"] = "Reiniciar ahora",
             ["btn_restart_later"] = "Reiniciar después",
+            ["card_packs_header"] = "Paquetes de cartas",
         },
         ["ITA"] = new()
         {
@@ -128,6 +137,7 @@ public static class Strings
             ["modal_body"] = "Per cambiare la skin, STS2 deve riavviarsi.\nScegli: riavvia ora o annulla la modifica.\n\nRiavvio automatico tra {0}s tramite Steam.",
             ["btn_restart_now"] = "Riavvia ora",
             ["btn_restart_later"] = "Riavvia dopo",
+            ["card_packs_header"] = "Pacchetti carte",
         },
         ["PTB"] = new()
         {
@@ -138,6 +148,7 @@ public static class Strings
             ["modal_body"] = "Para mudar a skin, o STS2 precisa reiniciar.\nEscolha: reiniciar agora ou cancelar a mudança.\n\nReinício automático em {0}s via Steam.",
             ["btn_restart_now"] = "Reiniciar agora",
             ["btn_restart_later"] = "Reiniciar depois",
+            ["card_packs_header"] = "Pacotes de cartas",
         },
         ["POR"] = new()
         {
@@ -148,6 +159,7 @@ public static class Strings
             ["modal_body"] = "Para alterar a skin, o STS2 precisa de reiniciar.\nEscolha: reiniciar agora ou cancelar a alteração.\n\nReinício automático em {0}s através do Steam.",
             ["btn_restart_now"] = "Reiniciar agora",
             ["btn_restart_later"] = "Reiniciar mais tarde",
+            ["card_packs_header"] = "Pacotes de cartas",
         },
         ["POL"] = new()
         {
@@ -158,6 +170,7 @@ public static class Strings
             ["modal_body"] = "Aby zmienić skina, STS2 musi się zrestartować.\nWybierz: zrestartuj teraz lub anuluj zmianę.\n\nAutomatyczny restart za {0}s przez Steam.",
             ["btn_restart_now"] = "Zrestartuj teraz",
             ["btn_restart_later"] = "Zrestartuj później",
+            ["card_packs_header"] = "Pakiety kart",
         },
         ["RUS"] = new()
         {
@@ -168,6 +181,7 @@ public static class Strings
             ["modal_body"] = "Чтобы изменить скин, STS2 должен перезапуститься.\nВыберите: перезапустить сейчас или отменить изменение.\n\nАвтоматический перезапуск через {0}с через Steam.",
             ["btn_restart_now"] = "Перезапустить сейчас",
             ["btn_restart_later"] = "Перезапустить позже",
+            ["card_packs_header"] = "Наборы карт",
         },
         ["THA"] = new()
         {
@@ -178,6 +192,7 @@ public static class Strings
             ["modal_body"] = "การเปลี่ยนสกินต้องรีสตาร์ท STS2\nเลือก: รีสตาร์ทตอนนี้ หรือยกเลิกการเปลี่ยนแปลง\n\nรีสตาร์ทอัตโนมัติใน {0} วินาที ผ่าน Steam",
             ["btn_restart_now"] = "รีสตาร์ทตอนนี้",
             ["btn_restart_later"] = "รีสตาร์ทภายหลัง",
+            ["card_packs_header"] = "ชุดการ์ด",
         },
         ["TUR"] = new()
         {
@@ -188,6 +203,7 @@ public static class Strings
             ["modal_body"] = "Skini değiştirmek için STS2'nin yeniden başlatılması gerekir.\nSeçin: şimdi yeniden başlat veya değişikliği iptal et.\n\n{0}s sonra Steam ile otomatik yeniden başlatma.",
             ["btn_restart_now"] = "Şimdi yeniden başlat",
             ["btn_restart_later"] = "Sonra yeniden başlat",
+            ["card_packs_header"] = "Kart paketleri",
         },
     };
 }

@@ -12,17 +12,26 @@ public sealed class ChoicesFileWatcher : IDisposable
     private readonly string _choicesPath;
     private readonly string _managerDataDir;
     private readonly IReadOnlyDictionary<string, List<DetectedSkinMod>> _byCharacter;
+    private readonly List<DetectedSkinMod> _cardMods;
     private FileSystemWatcher? _watcher;
     private DateTime _lastFireUtc = DateTime.MinValue;
 
     private readonly Dictionary<string, string> _appliedActive = new(StringComparer.OrdinalIgnoreCase);
+    private CardPacksConfig _appliedCardPacks;
 
-    public ChoicesFileWatcher(string choicesPath, string managerDataDir, IReadOnlyDictionary<string, List<DetectedSkinMod>> byCharacter, SkinChoicesConfig initial)
+    public ChoicesFileWatcher(
+        string choicesPath,
+        string managerDataDir,
+        IReadOnlyDictionary<string, List<DetectedSkinMod>> byCharacter,
+        List<DetectedSkinMod> cardMods,
+        SkinChoicesConfig initial)
     {
         _choicesPath = choicesPath;
         _managerDataDir = managerDataDir;
         _byCharacter = byCharacter;
+        _cardMods = cardMods;
         foreach (var (c, choice) in initial.Characters) _appliedActive[c] = choice.Active;
+        _appliedCardPacks = Clone(initial.CardPacks);
     }
 
     public void Start()
@@ -62,7 +71,8 @@ public sealed class ChoicesFileWatcher : IDisposable
     {
         var fresh = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
         var anyChange = false;
-        var revertSnapshot = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var revertActive = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var (character, variants) in _byCharacter)
         {
             if (!fresh.Characters.TryGetValue(character, out var choice)) continue;
@@ -71,42 +81,99 @@ public sealed class ChoicesFileWatcher : IDisposable
             if (string.Equals(newActive, prevActive, StringComparison.OrdinalIgnoreCase)) continue;
 
             anyChange = true;
-            MainFile.Logger.Info($"choices change: {character} '{prevActive}' → '{newActive}'");
-            revertSnapshot[character] = prevActive;
+            MainFile.Logger.Info($"character change: {character} '{prevActive}' → '{newActive}'");
+            revertActive[character] = prevActive;
             _appliedActive[character] = newActive;
+        }
+
+        var revertCardPacks = Clone(_appliedCardPacks);
+        var cardPacksChanged = !CardPacksEqual(fresh.CardPacks, _appliedCardPacks);
+        if (cardPacksChanged)
+        {
+            anyChange = true;
+            MainFile.Logger.Info($"card packs changed:");
+            foreach (var kv in fresh.CardPacks.Enabled)
+            {
+                var was = _appliedCardPacks.Enabled.TryGetValue(kv.Key, out var w) ? w : true;
+                if (was != kv.Value) MainFile.Logger.Info($"  {kv.Key}: enabled {was} → {kv.Value}");
+            }
+            if (!fresh.CardPacks.Ordering.SequenceEqual(_appliedCardPacks.Ordering, StringComparer.OrdinalIgnoreCase))
+            {
+                MainFile.Logger.Info($"  ordering: [{string.Join(",", _appliedCardPacks.Ordering)}] → [{string.Join(",", fresh.CardPacks.Ordering)}]");
+            }
+            _appliedCardPacks = Clone(fresh.CardPacks);
+
+            var userDataDir = Godot.OS.GetUserDataDir();
+            var settings = Sts2SettingsWriter.FindAndLoad(userDataDir);
+            if (settings != null)
+            {
+                var settingsChanged = CardPackApplier.ApplyToSettings(settings, fresh.CardPacks, _cardMods);
+                var memChanged = CardPackApplier.ApplyToMemoryModList(fresh.CardPacks);
+                if (settingsChanged) Sts2SettingsWriter.Save(settings);
+                MainFile.Logger.Info($"card pack applied to settings: file={settingsChanged} mem={memChanged}");
+            }
         }
 
         if (anyChange)
         {
-            MainFile.Logger.Info($"showing 10s restart countdown modal (with revert-on-cancel snapshot)");
-            RestartCountdownModal.ShowOrReset(_managerDataDir, 10, () => RevertSnapshot(revertSnapshot));
+            MainFile.Logger.Info($"showing 10s restart countdown modal");
+            RestartCountdownModal.ShowOrReset(_managerDataDir, 10, () => RevertSnapshot(revertActive, revertCardPacks));
         }
     }
 
-    private void RevertSnapshot(Dictionary<string, string> snapshot)
+    private void RevertSnapshot(Dictionary<string, string> revertActive, CardPacksConfig revertCardPacks)
     {
         try
         {
-            foreach (var kv in snapshot)
-            {
-                _appliedActive[kv.Key] = kv.Value;
-            }
+            foreach (var kv in revertActive) _appliedActive[kv.Key] = kv.Value;
+            _appliedCardPacks = Clone(revertCardPacks);
+
             var choices = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
-            foreach (var kv in snapshot)
+            foreach (var kv in revertActive)
             {
                 if (choices.Characters.TryGetValue(kv.Key, out var c))
                 {
-                    MainFile.Logger.Info($"revert: {kv.Key} → '{kv.Value}'");
+                    MainFile.Logger.Info($"revert character: {kv.Key} → '{kv.Value}'");
                     c.Active = kv.Value;
                 }
             }
+            choices.CardPacks = Clone(revertCardPacks);
             choices.Save(_choicesPath);
+
+            var userDataDir = Godot.OS.GetUserDataDir();
+            var settings = Sts2SettingsWriter.FindAndLoad(userDataDir);
+            if (settings != null)
+            {
+                CardPackApplier.ApplyToSettings(settings, revertCardPacks, _cardMods);
+                CardPackApplier.ApplyToMemoryModList(revertCardPacks);
+                Sts2SettingsWriter.Save(settings);
+                MainFile.Logger.Info($"revert card packs applied to settings");
+            }
+
             SkinSelectorOverlay.RefreshDropdown();
+            SkinSelectorOverlay.RefreshCardPacks();
         }
         catch (Exception ex)
         {
             MainFile.Logger.Warn($"RevertSnapshot error: {ex}");
         }
+    }
+
+    private static CardPacksConfig Clone(CardPacksConfig src) => new()
+    {
+        Ordering = new List<string>(src.Ordering),
+        Enabled = new Dictionary<string, bool>(src.Enabled, StringComparer.OrdinalIgnoreCase),
+    };
+
+    private static bool CardPacksEqual(CardPacksConfig a, CardPacksConfig b)
+    {
+        if (!a.Ordering.SequenceEqual(b.Ordering, StringComparer.OrdinalIgnoreCase)) return false;
+        if (a.Enabled.Count != b.Enabled.Count) return false;
+        foreach (var kv in a.Enabled)
+        {
+            if (!b.Enabled.TryGetValue(kv.Key, out var bv) || bv != kv.Value) return false;
+        }
+        return true;
     }
 
     public Dictionary<string, string> AppliedActive => _appliedActive;
