@@ -4,6 +4,9 @@ A Slay the Spire 2 mod that lets you switch between character skin mods at runti
 
 🇰🇷 [한국어 README](README.ko.md)
 
+![Character Select with skin dropdown and restart modal — English](docs/screenshots/character-select-en.png)
+![리젠트 캐릭터 선택 화면 + 한국어 모달](docs/screenshots/character-select-ko.png)
+
 ## Features
 
 - **Automatic detection** — scans `<sts2>/mods/*/` for any `.pck` containing `res://animations/characters/{character}/...` paths. No manifest convention required, works with existing skin mods (e.g. Mesugaki_Regent, Booba-Necrobinder-Mod) out of the box.

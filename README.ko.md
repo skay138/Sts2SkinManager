@@ -4,6 +4,9 @@
 
 🇺🇸 [English README](README.md)
 
+![리젠트 캐릭터 선택 화면 + 한국어 모달](docs/screenshots/character-select-ko.png)
+![Necrobinder character select with English modal](docs/screenshots/character-select-en.png)
+
 ## 기능
 
 - **자동 인식** — `<sts2>/mods/*/` 의 모든 `.pck` 를 스캔해서 `res://animations/characters/{캐릭터}/...` 경로를 포함한 것을 스킨 모드로 자동 감지. 별도 manifest 규약 없이 기존 스킨 모드 (Mesugaki_Regent, Booba-Necrobinder-Mod 등) 가 그대로 동작.
