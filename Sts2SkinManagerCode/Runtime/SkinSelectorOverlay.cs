@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using MegaCrit.Sts2.Core.Localization;
 using Sts2SkinManager.Config;
 using Sts2SkinManager.Discovery;
 using Sts2SkinManager.Localization;
@@ -14,8 +15,11 @@ public static class SkinSelectorOverlay
     private static Dictionary<string, List<DetectedSkinMod>>? _byCharacter;
     private static OptionButton? _opt;
     private static Label? _label;
+    private static Control? _hbox;
+    private static Node? _lastScreen;
     private static string _currentCharacter = "";
     private static bool _suppressNextItemSelected;
+    private static bool _localeChangeSubscribed;
 
     public static void Configure(string choicesPath, Dictionary<string, List<DetectedSkinMod>> byCharacter)
     {
@@ -32,13 +36,19 @@ public static class SkinSelectorOverlay
     {
         try
         {
-            if (_opt != null && GodotObject.IsInstanceValid(_opt)) return;
+            if (_opt != null && GodotObject.IsInstanceValid(_opt) && _opt.IsInsideTree())
+            {
+                MainFile.Logger.Info("overlay already attached and in tree; skipping re-attach");
+                return;
+            }
+            _lastScreen = screen;
 
             var hbox = new HBoxContainer
             {
                 Position = new Vector2(40, 40),
                 CustomMinimumSize = new Vector2(420, 56),
             };
+            _hbox = hbox;
             _label = new Label
             {
                 Text = Strings.Get("skin_label") + ":",
@@ -58,11 +68,80 @@ public static class SkinSelectorOverlay
             screen.AddChild(hbox);
             MainFile.Logger.Info($"SkinSelectorOverlay attached (OptionButton) to {screen.Name}");
             RefreshItems();
+            EnsureLocaleSubscribed();
         }
         catch (Exception ex)
         {
             MainFile.Logger.Warn($"overlay attach failed: {ex.Message}");
         }
+    }
+
+    private static void EnsureLocaleSubscribed()
+    {
+        if (_localeChangeSubscribed) return;
+        try
+        {
+            if (LocManager.Instance == null) { MainFile.Logger.Warn("LocManager.Instance null at subscribe time"); return; }
+            LocManager.Instance.SubscribeToLocaleChange(OnLocaleChanged);
+            _localeChangeSubscribed = true;
+            MainFile.Logger.Info("subscribed to LocManager locale change");
+        }
+        catch (Exception ex)
+        {
+            MainFile.Logger.Warn($"failed to subscribe to locale change: {ex.Message}");
+        }
+    }
+
+    private static void OnLocaleChanged()
+    {
+        Callable.From(() =>
+        {
+            try
+            {
+                MainFile.Logger.Info($"locale changed → reconciling overlay (was attached to '{_lastScreen?.Name}')");
+                if (_hbox != null && GodotObject.IsInstanceValid(_hbox) && _hbox.IsInsideTree())
+                {
+                    MainFile.Logger.Info("overlay still in tree; refreshing label/items");
+                    if (_label != null && GodotObject.IsInstanceValid(_label))
+                    {
+                        _label.Text = Strings.Get("skin_label") + ":";
+                    }
+                    RefreshItems();
+                    return;
+                }
+
+                MainFile.Logger.Info("overlay lost from tree → re-attaching");
+                _opt = null;
+                _label = null;
+                _hbox = null;
+                var mainLoop = Engine.GetMainLoop();
+                if (mainLoop is not SceneTree tree) return;
+                var screen = FindCharacterSelectScreen(tree.Root);
+                if (screen != null)
+                {
+                    DoAttach(screen);
+                }
+                else
+                {
+                    MainFile.Logger.Info("no CharacterSelectScreen in tree currently; will re-attach when user navigates back");
+                }
+            }
+            catch (Exception ex)
+            {
+                MainFile.Logger.Warn($"OnLocaleChanged error: {ex.Message}");
+            }
+        }).CallDeferred();
+    }
+
+    private static Node? FindCharacterSelectScreen(Node start)
+    {
+        if (start.Name.ToString().Contains("CharacterSelectScreen", StringComparison.OrdinalIgnoreCase)) return start;
+        foreach (var child in start.GetChildren())
+        {
+            var found = FindCharacterSelectScreen(child);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     public static void OnCharacterSelected(string characterId)
