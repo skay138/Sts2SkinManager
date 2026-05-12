@@ -41,7 +41,11 @@ public static class CardPackApplier
         var orderedIds = packs.Ordering;
         var orderedSet = new HashSet<string>(orderedIds, StringComparer.OrdinalIgnoreCase);
         var nonCardEntries = entries.Where(e => !orderedSet.Contains(e["id"]?.GetValue<string>() ?? "")).ToList();
+        // Top of UI list = highest priority = mounted LAST = goes to END of mod_list.
+        // mod_list iterates in order, so reverse the UI ordering when writing.
         var orderedCardEntries = orderedIds
+            .AsEnumerable()
+            .Reverse()
             .Where(id => byModId.ContainsKey(id))
             .Select(id => byModId[id])
             .ToList();

@@ -19,6 +19,9 @@ public class CharacterSkinChoice
 
 public class CardPacksConfig
 {
+    [JsonPropertyName("schema")]
+    public int Schema { get; set; } = 1;
+
     [JsonPropertyName("ordering")]
     public List<string> Ordering { get; set; } = new();
 
@@ -52,6 +55,16 @@ public class SkinChoicesConfig
             {
                 cfg.CardPacks = JsonSerializer.Deserialize<CardPacksConfig>(cardPacksNode.ToJsonString(), JsonOpts) ?? new CardPacksConfig();
                 root.Remove("_card_packs");
+
+                if (cfg.CardPacks.Schema < 2)
+                {
+                    cfg.CardPacks.Ordering.Reverse();
+                    cfg.CardPacks.Schema = 2;
+                }
+            }
+            else
+            {
+                cfg.CardPacks.Schema = 2;
             }
 
             cfg.Characters = JsonSerializer.Deserialize<Dictionary<string, CharacterSkinChoice>>(root.ToJsonString(), JsonOpts) ?? new(StringComparer.OrdinalIgnoreCase);

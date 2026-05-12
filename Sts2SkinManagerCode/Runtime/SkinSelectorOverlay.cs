@@ -19,7 +19,10 @@ public static class SkinSelectorOverlay
     private static Label? _label;
     private static Control? _hbox;
     private static VBoxContainer? _cardPackVBox;
-    private static Label? _cardPackHeader;
+    private static Button? _cardPackHeaderBtn;
+    private static ScrollContainer? _cardPackScroll;
+    private static VBoxContainer? _cardPackRows;
+    private static bool _cardPackExpanded = true;
 
     private static Node? _lastScreen;
     private static string _currentCharacter = "";
@@ -88,45 +91,89 @@ public static class SkinSelectorOverlay
         var vbox = new VBoxContainer
         {
             Position = new Vector2(40, 110),
-            CustomMinimumSize = new Vector2(480, 80),
+            CustomMinimumSize = new Vector2(480, 40),
         };
         _cardPackVBox = vbox;
 
-        var header = new Label
+        var headerBtn = new Button
         {
-            Text = Strings.Get("card_packs_header") + ":",
-            CustomMinimumSize = new Vector2(420, 28),
+            CustomMinimumSize = new Vector2(480, 32),
+            Alignment = HorizontalAlignment.Left,
         };
-        _cardPackHeader = header;
-        vbox.AddChild(header);
+        _cardPackHeaderBtn = headerBtn;
+        headerBtn.Pressed += ToggleCardPackExpanded;
+        vbox.AddChild(headerBtn);
+
+        var scroll = new ScrollContainer
+        {
+            CustomMinimumSize = new Vector2(480, 200),
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+            VerticalScrollMode = ScrollContainer.ScrollMode.Auto,
+        };
+        _cardPackScroll = scroll;
+        vbox.AddChild(scroll);
+
+        var rows = new VBoxContainer
+        {
+            CustomMinimumSize = new Vector2(460, 0),
+        };
+        _cardPackRows = rows;
+        scroll.AddChild(rows);
 
         BuildCardPackRows();
+        UpdateCardPackHeader();
+        ApplyCardPackExpanded();
 
         vbox.ZIndex = 1000;
         screen.AddChild(vbox);
         MainFile.Logger.Info($"card pack panel attached ({_cardMods.Count} packs)");
     }
 
+    private static void ToggleCardPackExpanded()
+    {
+        _cardPackExpanded = !_cardPackExpanded;
+        ApplyCardPackExpanded();
+        UpdateCardPackHeader();
+        MainFile.Logger.Info($"card pack panel {(_cardPackExpanded ? "expanded" : "collapsed")}");
+    }
+
+    private static void ApplyCardPackExpanded()
+    {
+        if (_cardPackScroll != null && GodotObject.IsInstanceValid(_cardPackScroll))
+        {
+            _cardPackScroll.Visible = _cardPackExpanded;
+        }
+    }
+
+    private static void UpdateCardPackHeader()
+    {
+        if (_cardPackHeaderBtn == null || !GodotObject.IsInstanceValid(_cardPackHeaderBtn)) return;
+        var choices = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
+        var total = choices.CardPacks.Ordering.Count;
+        var enabled = choices.CardPacks.Enabled.Count(kv => kv.Value);
+        var arrow = _cardPackExpanded ? "▼" : "▶";
+        _cardPackHeaderBtn.Text = $"{arrow}  {Strings.Get("card_packs_header")} ({enabled}/{total})";
+    }
+
     private static void BuildCardPackRows()
     {
-        if (_cardPackVBox == null || !GodotObject.IsInstanceValid(_cardPackVBox)) return;
+        if (_cardPackRows == null || !GodotObject.IsInstanceValid(_cardPackRows)) return;
 
-        for (var i = _cardPackVBox.GetChildCount() - 1; i >= 1; i--)
+        for (var i = _cardPackRows.GetChildCount() - 1; i >= 0; i--)
         {
-            var child = _cardPackVBox.GetChild(i);
-            _cardPackVBox.RemoveChild(child);
+            var child = _cardPackRows.GetChild(i);
+            _cardPackRows.RemoveChild(child);
             child.QueueFree();
         }
 
         var choices = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
-        if (_cardPackHeader != null) _cardPackHeader.Text = Strings.Get("card_packs_header") + ":";
-
         for (var i = 0; i < choices.CardPacks.Ordering.Count; i++)
         {
             var modId = choices.CardPacks.Ordering[i];
             var row = BuildCardPackRow(modId, choices.CardPacks, i, choices.CardPacks.Ordering.Count);
-            _cardPackVBox.AddChild(row);
+            _cardPackRows.AddChild(row);
         }
+        UpdateCardPackHeader();
     }
 
     private static Control BuildCardPackRow(string modId, CardPacksConfig packs, int index, int total)
@@ -142,10 +189,19 @@ public static class SkinSelectorOverlay
         check.Toggled += isOn => OnCardPackToggle(modId, isOn);
         hbox.AddChild(check);
 
+        var orderLabel = new Label
+        {
+            Text = $"{index + 1}.",
+            CustomMinimumSize = new Vector2(32, 32),
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Right,
+        };
+        hbox.AddChild(orderLabel);
+
         var label = new Label
         {
             Text = modId,
-            CustomMinimumSize = new Vector2(340, 32),
+            CustomMinimumSize = new Vector2(308, 32),
             VerticalAlignment = VerticalAlignment.Center,
         };
         hbox.AddChild(label);
@@ -241,10 +297,6 @@ public static class SkinSelectorOverlay
                         _label.Text = Strings.Get("skin_label") + ":";
                     }
                     RefreshItems();
-                    if (_cardPackHeader != null && GodotObject.IsInstanceValid(_cardPackHeader))
-                    {
-                        _cardPackHeader.Text = Strings.Get("card_packs_header") + ":";
-                    }
                     BuildCardPackRows();
                     return;
                 }
@@ -254,7 +306,9 @@ public static class SkinSelectorOverlay
                 _label = null;
                 _hbox = null;
                 _cardPackVBox = null;
-                _cardPackHeader = null;
+                _cardPackHeaderBtn = null;
+                _cardPackScroll = null;
+                _cardPackRows = null;
                 var mainLoop = Engine.GetMainLoop();
                 if (mainLoop is not SceneTree tree) return;
                 var screen = FindCharacterSelectScreen(tree.Root);

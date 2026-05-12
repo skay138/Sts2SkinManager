@@ -15,7 +15,7 @@
 - **Steam 자동 재실행** — 확인 시 매니저가 helper 를 spawn → STS2 종료 대기 → `steam://run/2868840` 으로 재실행. 새 세션에서 선택한 스킨 자동 적용.
 - **취소 시 자동 revert** — "Restart later" 클릭 시 선택이 이전 값으로 자동 되돌아가서 동일 옵션을 다시 골라도 모달이 다시 떠요.
 - **다국어 지원** — UI 문자열이 게임 현재 언어를 따라감. 지원: English, 한국어, 日本語, 简体中文/繁體中文, Deutsch, Français, Español (Castellano/Latam), Italiano, Português (BR/PT), Polski, Русский, ไทย, Türkçe. 미지원 언어는 English 폴백.
-- **카드팩 관리 (v0.2.0+)** — 카드 아트 모드 (`.pck` 에 `card_art/MegaCrit.Sts2.Core.Models.Cards.*` 덮기 OR `card_portraits/` 자체 namespace) 자동 감지. Character Select 화면에 별도 패널 (체크박스 + ↑/↓ 화살표) 표시. 여러 팩 동시 활성 가능, 겹치는 카드는 리스트 **아래에 있는 팩이 이김** (last-mounted-wins). 토글/순서 변경 시 STS2 `settings.save` 갱신 + 캐릭터 스킨과 동일한 재시작 모달.
+- **카드팩 관리 (v0.2.0+)** — 카드 아트 모드 (`.pck` 에 `card_art/MegaCrit.Sts2.Core.Models.Cards.*` 덮기 OR `card_portraits/` 자체 namespace) 자동 감지. Character Select 화면에 별도 패널 (체크박스 + ↑/↓ 화살표 + `1./2./3.` 우선순위 번호) 표시. 여러 팩 동시 활성 가능, 겹치는 카드는 **리스트 상단의 팩이 이김**. 패널은 접고 펼 수 있고 (▼/▶ 헤더), 긴 목록은 자동 스크롤. 토글/순서 변경 시 STS2 `settings.save` 갱신 + 캐릭터 스킨과 동일한 재시작 모달.
 
 ## 동작 방식
 
