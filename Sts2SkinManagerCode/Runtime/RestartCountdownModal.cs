@@ -3,6 +3,7 @@ using Godot;
 using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
+using Sts2SkinManager.Localization;
 
 namespace Sts2SkinManager.Runtime;
 
@@ -74,11 +75,11 @@ public static class RestartCountdownModal
             }
             var popup = packed.Instantiate<NVerticalPopup>();
             tree.Root.AddChild(popup);
-            popup.SetText("Sts2 Skin Manager", BuildBody());
-            popup.YesButton.SetText("Restart now");
+            popup.SetText(Strings.Get("modal_title"), BuildBody());
+            popup.YesButton.SetText(Strings.Get("btn_restart_now"));
             popup.YesButton.IsYes = true;
             popup.YesButton.Released += _ => OnYes();
-            popup.NoButton.SetText("Restart later");
+            popup.NoButton.SetText(Strings.Get("btn_restart_later"));
             popup.NoButton.IsYes = false;
             popup.NoButton.Visible = true;
             popup.NoButton.Released += _ => OnNo();
@@ -122,16 +123,11 @@ public static class RestartCountdownModal
     {
         if (_popup != null && GodotObject.IsInstanceValid(_popup))
         {
-            _popup.SetText("Sts2 Skin Manager", BuildBody());
+            _popup.SetText(Strings.Get("modal_title"), BuildBody());
         }
     }
 
-    private static string BuildBody() =>
-        $"Your skin choice was saved.\n\n" +
-        $"To see the visual change, STS2 must restart.\n" +
-        $"Auto-restart in {_remaining} second{(_remaining == 1 ? "" : "s")} via Steam.\n\n" +
-        $"• Restart now → apply visual immediately\n" +
-        $"• Restart later → keep playing; visual applies on next manual restart";
+    private static string BuildBody() => Strings.Get("modal_body", _remaining);
 
     private static void OnYes()
     {

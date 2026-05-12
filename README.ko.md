@@ -11,6 +11,7 @@
 - **카운트다운 모달** — STS2 native `NVerticalPopup` 스타일. "Restart now" 즉시 적용 / "Restart later" 보류.
 - **Steam 자동 재실행** — 확인 시 매니저가 helper 를 spawn → STS2 종료 대기 → `steam://run/2868840` 으로 재실행. 새 세션에서 선택한 스킨 자동 적용.
 - **취소 시 자동 revert** — "Restart later" 클릭 시 선택이 이전 값으로 자동 되돌아가서 동일 옵션을 다시 골라도 모달이 다시 떠요.
+- **다국어 지원** — UI 문자열이 게임 현재 언어를 따라감. 지원: English, 한국어, 日本語, 简体中文/繁體中文, Deutsch, Français, Español (Castellano/Latam), Italiano, Português (BR/PT), Polski, Русский, ไทย, Türkçe. 미지원 언어는 English 폴백.
 
 ## 동작 방식
 

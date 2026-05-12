@@ -4,6 +4,7 @@ using System.Linq;
 using Godot;
 using Sts2SkinManager.Config;
 using Sts2SkinManager.Discovery;
+using Sts2SkinManager.Localization;
 
 namespace Sts2SkinManager.Runtime;
 
@@ -40,7 +41,7 @@ public static class SkinSelectorOverlay
             };
             _label = new Label
             {
-                Text = "Skin:",
+                Text = Strings.Get("skin_label") + ":",
                 CustomMinimumSize = new Vector2(80, 56),
                 VerticalAlignment = VerticalAlignment.Center,
             };
@@ -82,18 +83,19 @@ public static class SkinSelectorOverlay
         try
         {
             _opt.Clear();
-            if (_label != null) _label.Text = $"Skin [{(string.IsNullOrEmpty(_currentCharacter) ? "—" : _currentCharacter)}]:";
+            var skinLabel = Strings.Get("skin_label");
+            if (_label != null) _label.Text = $"{skinLabel} [{(string.IsNullOrEmpty(_currentCharacter) ? "—" : _currentCharacter)}]:";
 
             if (_byCharacter == null || !_byCharacter.TryGetValue(_currentCharacter, out var variants) || variants.Count == 0)
             {
-                _opt.AddItem("(no variants)");
+                _opt.AddItem(Strings.Get("no_variants"));
                 _opt.Disabled = true;
                 return;
             }
             var choices = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
             if (!choices.Characters.TryGetValue(_currentCharacter, out var c))
             {
-                _opt.AddItem("(not configured)");
+                _opt.AddItem(Strings.Get("not_configured"));
                 _opt.Disabled = true;
                 return;
             }

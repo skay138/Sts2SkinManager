@@ -11,6 +11,7 @@ A Slay the Spire 2 mod that lets you switch between character skin mods at runti
 - **Confirmation modal with countdown** — uses STS2's native `NVerticalPopup` style. Pick "Restart now" to apply immediately, "Restart later" to keep playing.
 - **Auto-restart via Steam** — when you confirm, the mod spawns a helper that waits for STS2 to exit, then relaunches it through `steam://run/2868840`. New session boots with the chosen variant pre-mounted.
 - **Cancel → revert** — if you click "Restart later", your selection is rolled back so re-picking the same option triggers the modal again.
+- **Multi-language** — UI strings follow the game's current language. Supported: English, Korean, Japanese, Simplified/Traditional Chinese, German, French, Spanish (Castellano/Latam), Italian, Portuguese (BR/PT), Polish, Russian, Thai, Turkish. Unsupported languages fall back to English.
 
 ## How it works
 
