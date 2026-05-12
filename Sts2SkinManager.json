@@ -3,7 +3,7 @@
     "name": "STS2 Skin Manager",
     "author": "inggom",
     "description": "Manage installed character skin mods and card skin mods from one in-game panel on the Character Select screen, with on-hover preview of each skin before you commit.",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "has_pck": false,
     "has_dll": true,
     "dependencies": [],

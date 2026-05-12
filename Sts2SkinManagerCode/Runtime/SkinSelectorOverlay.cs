@@ -19,6 +19,10 @@ public static class SkinSelectorOverlay
     private static OptionButton? _opt;
     private static Label? _label;
     private static Control? _hbox;
+    private static Button? _variantEditBtn;
+    private static Button? _variantSaveBtn;
+    private static Button? _variantCancelBtn;
+    private static LineEdit? _variantEditLine;
     private static Label? _previewHoverIcon;
     private static Control? _previewContainer;
     private static TextureRect? _previewRect;
@@ -107,6 +111,50 @@ public static class SkinSelectorOverlay
             _opt.Pressed += () => MainFile.Logger.Info("OptionButton pressed (dropdown opened)");
             hbox.AddChild(_label);
             hbox.AddChild(_opt);
+
+            _variantEditLine = new LineEdit
+            {
+                CustomMinimumSize = new Vector2(240, 56),
+                PlaceholderText = Strings.Get("alias_placeholder"),
+                Visible = false,
+            };
+            hbox.AddChild(_variantEditLine);
+            _variantEditLine.TextSubmitted += OnVariantAliasSubmitted;
+            _variantEditLine.TextChanged += _ =>
+            {
+                if (_variantEditLine == null || !GodotObject.IsInstanceValid(_variantEditLine)) return;
+                _variantEditLine.Modulate = Colors.White;
+                _variantEditLine.TooltipText = "";
+            };
+
+            _variantEditBtn = new Button
+            {
+                Text = "✏",
+                CustomMinimumSize = new Vector2(40, 56),
+                TooltipText = Strings.Get("alias_edit_tooltip"),
+            };
+            _variantEditBtn.Pressed += ToggleVariantEditMode;
+            hbox.AddChild(_variantEditBtn);
+
+            _variantSaveBtn = new Button
+            {
+                Text = "✓",
+                CustomMinimumSize = new Vector2(40, 56),
+                TooltipText = Strings.Get("alias_save_tooltip"),
+                Visible = false,
+            };
+            _variantSaveBtn.Pressed += () => OnVariantAliasSubmitted(_variantEditLine.Text);
+            hbox.AddChild(_variantSaveBtn);
+
+            _variantCancelBtn = new Button
+            {
+                Text = "✕",
+                CustomMinimumSize = new Vector2(40, 56),
+                TooltipText = Strings.Get("alias_cancel_tooltip"),
+                Visible = false,
+            };
+            _variantCancelBtn.Pressed += ExitVariantEditMode;
+            hbox.AddChild(_variantCancelBtn);
 
             var hoverIcon = new Label
             {
@@ -197,7 +245,7 @@ public static class SkinSelectorOverlay
         if (_previewAvailable)
         {
             _previewRect.Texture = tex;
-            _previewCaption.Text = variant;
+            _previewCaption.Text = AliasService.Resolve(variant, LoadAliases());
         }
         else
         {
@@ -374,7 +422,7 @@ public static class SkinSelectorOverlay
         }
         if (_previewCaption != null && GodotObject.IsInstanceValid(_previewCaption))
         {
-            _previewCaption.Text = _previewAvailable ? modId : "";
+            _previewCaption.Text = _previewAvailable ? AliasService.Resolve(modId, LoadAliases()) : "";
         }
         _previewHovered = _previewAvailable;
         ApplyPreviewVisibility();
@@ -611,17 +659,92 @@ public static class SkinSelectorOverlay
         };
         hbox.AddChild(orderLabel);
 
+        var aliases = LoadAliases();
         var label = new Label
         {
-            Text = modId,
-            CustomMinimumSize = new Vector2(280, 32),
+            Text = AliasService.Resolve(modId, aliases),
+            CustomMinimumSize = new Vector2(248, 32),
             VerticalAlignment = VerticalAlignment.Center,
             MouseFilter = Control.MouseFilterEnum.Stop,
-            TooltipText = Strings.Get("preview_toggle_tooltip"),
+            TooltipText = modId, // raw key always reachable via hover
         };
         label.MouseEntered += () => OnCardRowHoverStart(modId);
         label.MouseExited += () => OnCardRowHoverEnd(modId);
         hbox.AddChild(label);
+
+        var aliasEdit = new LineEdit
+        {
+            CustomMinimumSize = new Vector2(192, 32),
+            PlaceholderText = Strings.Get("alias_placeholder"),
+            Visible = false,
+        };
+        hbox.AddChild(aliasEdit);
+
+        var editBtn = new Button
+        {
+            Text = "✏",
+            CustomMinimumSize = new Vector2(28, 32),
+            TooltipText = Strings.Get("alias_edit_tooltip"),
+        };
+        hbox.AddChild(editBtn);
+
+        var saveBtn = new Button
+        {
+            Text = "✓",
+            CustomMinimumSize = new Vector2(28, 32),
+            TooltipText = Strings.Get("alias_save_tooltip"),
+            Visible = false,
+        };
+        hbox.AddChild(saveBtn);
+
+        var cancelBtn = new Button
+        {
+            Text = "✕",
+            CustomMinimumSize = new Vector2(28, 32),
+            TooltipText = Strings.Get("alias_cancel_tooltip"),
+            Visible = false,
+        };
+        hbox.AddChild(cancelBtn);
+
+        void EnterEditMode()
+        {
+            aliasEdit.Text = LoadAliases().TryGetValue(modId, out var cur) ? cur : "";
+            label.Visible = false;
+            editBtn.Visible = false;
+            aliasEdit.Visible = true;
+            saveBtn.Visible = true;
+            cancelBtn.Visible = true;
+            aliasEdit.Modulate = Colors.White;
+            aliasEdit.TooltipText = "";
+            aliasEdit.GrabFocus();
+            aliasEdit.CaretColumn = aliasEdit.Text.Length;
+        }
+
+        void ExitEditMode()
+        {
+            aliasEdit.Visible = false;
+            saveBtn.Visible = false;
+            cancelBtn.Visible = false;
+            label.Visible = true;
+            editBtn.Visible = true;
+            label.Text = AliasService.Resolve(modId, LoadAliases());
+        }
+
+        void TrySave()
+        {
+            if (TrySaveAlias(modId, aliasEdit.Text, aliasEdit)) ExitEditMode();
+        }
+
+        editBtn.Pressed += EnterEditMode;
+        saveBtn.Pressed += TrySave;
+        cancelBtn.Pressed += ExitEditMode;
+        aliasEdit.TextSubmitted += _ => TrySave();
+        aliasEdit.TextChanged += _ =>
+        {
+            // Clear error styling while user is still typing.
+            aliasEdit.Modulate = Colors.White;
+            aliasEdit.TooltipText = "";
+        };
 
         void ApplyVisual(bool isOn)
         {
@@ -817,6 +940,137 @@ public static class SkinSelectorOverlay
         Enabled = new Dictionary<string, bool>(src.Enabled, StringComparer.OrdinalIgnoreCase),
     };
 
+    private static string GetSelectedVariantModId()
+    {
+        if (_opt == null || !GodotObject.IsInstanceValid(_opt) || _opt.ItemCount == 0) return "";
+        var idx = _opt.Selected;
+        if (idx < 0 || idx >= _opt.ItemCount) return "";
+        var meta = _opt.GetItemMetadata(idx);
+        return meta.VariantType == Variant.Type.String ? meta.AsString() : _opt.GetItemText(idx);
+    }
+
+    private static void UpdateVariantEditBtnState(string variantModId)
+    {
+        if (_variantEditBtn == null || !GodotObject.IsInstanceValid(_variantEditBtn)) return;
+        // "default" is a virtual variant (= unmount everything) — no alias makes sense for it.
+        // Dropdown being disabled (no variants / no config) also disables aliasing.
+        var dropdownActive = _opt != null && GodotObject.IsInstanceValid(_opt) && !_opt.Disabled;
+        var canEdit = dropdownActive
+            && !string.IsNullOrEmpty(variantModId)
+            && !string.Equals(variantModId, "default", StringComparison.OrdinalIgnoreCase);
+        _variantEditBtn.Disabled = !canEdit;
+        _variantEditBtn.Modulate = canEdit ? Colors.White : new Color(0.55f, 0.55f, 0.55f);
+    }
+
+    private static void ToggleVariantEditMode()
+    {
+        if (_variantEditLine == null || !GodotObject.IsInstanceValid(_variantEditLine)) return;
+        if (_opt == null || !GodotObject.IsInstanceValid(_opt)) return;
+        if (_variantEditLine.Visible) { ExitVariantEditMode(); return; }
+
+        var modId = GetSelectedVariantModId();
+        if (string.IsNullOrEmpty(modId) || string.Equals(modId, "default", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        _variantEditLine.Text = LoadAliases().TryGetValue(modId, out var cur) ? cur : "";
+        _variantEditLine.Modulate = Colors.White;
+        _variantEditLine.TooltipText = "";
+        _opt.Visible = false;
+        if (_variantEditBtn != null && GodotObject.IsInstanceValid(_variantEditBtn)) _variantEditBtn.Visible = false;
+        _variantEditLine.Visible = true;
+        if (_variantSaveBtn != null && GodotObject.IsInstanceValid(_variantSaveBtn)) _variantSaveBtn.Visible = true;
+        if (_variantCancelBtn != null && GodotObject.IsInstanceValid(_variantCancelBtn)) _variantCancelBtn.Visible = true;
+        _variantEditLine.GrabFocus();
+        _variantEditLine.CaretColumn = _variantEditLine.Text.Length;
+    }
+
+    private static void ExitVariantEditMode()
+    {
+        if (_variantEditLine == null || !GodotObject.IsInstanceValid(_variantEditLine)) return;
+        if (_opt == null || !GodotObject.IsInstanceValid(_opt)) return;
+        _variantEditLine.Visible = false;
+        if (_variantSaveBtn != null && GodotObject.IsInstanceValid(_variantSaveBtn)) _variantSaveBtn.Visible = false;
+        if (_variantCancelBtn != null && GodotObject.IsInstanceValid(_variantCancelBtn)) _variantCancelBtn.Visible = false;
+        _opt.Visible = true;
+        if (_variantEditBtn != null && GodotObject.IsInstanceValid(_variantEditBtn)) _variantEditBtn.Visible = true;
+    }
+
+    private static void OnVariantAliasSubmitted(string newText)
+    {
+        if (_variantEditLine == null || !GodotObject.IsInstanceValid(_variantEditLine)) return;
+        var modId = GetSelectedVariantModId();
+        if (string.IsNullOrEmpty(modId)) { ExitVariantEditMode(); return; }
+        if (TrySaveAlias(modId, newText, _variantEditLine)) ExitVariantEditMode();
+    }
+
+    private static Dictionary<string, string> LoadAliases()
+    {
+        var choices = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
+        return new Dictionary<string, string>(choices.Aliases, StringComparer.OrdinalIgnoreCase);
+    }
+
+    // All modIds the user could possibly assign an alias to — variant pcks + card packs.
+    // Used to enforce "alias must not collide with any modId or other alias".
+    private static IEnumerable<string> EnumerateAllModIds()
+    {
+        if (_byCharacter != null)
+        {
+            foreach (var kv in _byCharacter)
+                foreach (var v in kv.Value)
+                    yield return v.ModId;
+        }
+        foreach (var m in _cardMods) yield return m.ModId;
+    }
+
+    // Saves an alias attempt. Returns true when the alias is accepted (incl. empty = clear);
+    // returns false when validation rejects the input, and styles `edit` to indicate the error.
+    private static bool TrySaveAlias(string modId, string newAlias, LineEdit edit)
+    {
+        try
+        {
+            var trimmed = (newAlias ?? "").Trim();
+            var choices = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
+
+            if (string.IsNullOrEmpty(trimmed))
+            {
+                // Empty = clear the alias.
+                if (choices.Aliases.Remove(modId))
+                {
+                    choices.Save(_choicesPath);
+                    MainFile.Logger.Info($"alias cleared: {modId}");
+                    Callable.From(() => { BuildCardPackRows(); RefreshItems(); }).CallDeferred();
+                }
+                return true;
+            }
+
+            var verdict = AliasService.Validate(modId, trimmed, EnumerateAllModIds(), choices.Aliases);
+            if (verdict != AliasService.AliasValidationResult.Ok)
+            {
+                edit.Modulate = new Color(1f, 0.55f, 0.55f);
+                edit.TooltipText = verdict switch
+                {
+                    AliasService.AliasValidationResult.CollidesWithModId => Strings.Get("alias_dup_modid"),
+                    AliasService.AliasValidationResult.CollidesWithOtherAlias => Strings.Get("alias_dup_alias"),
+                    AliasService.AliasValidationResult.SameAsOwnModId => Strings.Get("alias_same_as_own"),
+                    _ => "",
+                };
+                MainFile.Logger.Info($"alias rejected for {modId}: {verdict} (input='{trimmed}')");
+                return false;
+            }
+
+            choices.Aliases[modId] = trimmed;
+            choices.Save(_choicesPath);
+            MainFile.Logger.Info($"alias saved: {modId} → '{trimmed}'");
+            Callable.From(() => { BuildCardPackRows(); RefreshItems(); }).CallDeferred();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            MainFile.Logger.Warn($"TrySaveAlias error: {ex.Message}");
+            return false;
+        }
+    }
+
     public static void RefreshCardPacks()
     {
         Callable.From(() =>
@@ -860,6 +1114,22 @@ public static class SkinSelectorOverlay
                     {
                         _previewHoverIcon.TooltipText = Strings.Get("preview_toggle_tooltip");
                     }
+                    if (_variantEditBtn != null && GodotObject.IsInstanceValid(_variantEditBtn))
+                    {
+                        _variantEditBtn.TooltipText = Strings.Get("alias_edit_tooltip");
+                    }
+                    if (_variantSaveBtn != null && GodotObject.IsInstanceValid(_variantSaveBtn))
+                    {
+                        _variantSaveBtn.TooltipText = Strings.Get("alias_save_tooltip");
+                    }
+                    if (_variantCancelBtn != null && GodotObject.IsInstanceValid(_variantCancelBtn))
+                    {
+                        _variantCancelBtn.TooltipText = Strings.Get("alias_cancel_tooltip");
+                    }
+                    if (_variantEditLine != null && GodotObject.IsInstanceValid(_variantEditLine))
+                    {
+                        _variantEditLine.PlaceholderText = Strings.Get("alias_placeholder");
+                    }
                     RefreshItems();
                     BuildCardPackRows();
                     return;
@@ -869,6 +1139,10 @@ public static class SkinSelectorOverlay
                 _opt = null;
                 _label = null;
                 _hbox = null;
+                _variantEditBtn = null;
+                _variantSaveBtn = null;
+                _variantCancelBtn = null;
+                _variantEditLine = null;
                 _previewHoverIcon = null;
                 _previewContainer = null;
                 _previewRect = null;
@@ -936,6 +1210,8 @@ public static class SkinSelectorOverlay
                 if (_label != null) _label.Text = $"{skinLabel} [{(string.IsNullOrEmpty(_currentCharacter) ? "—" : _currentCharacter)}]:";
                 _opt.AddItem(Strings.Get("no_variants"));
                 _opt.Disabled = true;
+                ExitVariantEditMode();
+                UpdateVariantEditBtnState("");
                 UpdatePreview("default");
                 return;
             }
@@ -945,6 +1221,8 @@ public static class SkinSelectorOverlay
                 if (_label != null) _label.Text = $"{skinLabel} [{(string.IsNullOrEmpty(_currentCharacter) ? "—" : _currentCharacter)}]:";
                 _opt.AddItem(Strings.Get("not_configured"));
                 _opt.Disabled = true;
+                ExitVariantEditMode();
+                UpdateVariantEditBtnState("");
                 UpdatePreview("default");
                 return;
             }
@@ -957,15 +1235,21 @@ public static class SkinSelectorOverlay
             var dirtyMark = charDirty ? " *" : "";
             if (_label != null) _label.Text = $"{skinLabel} [{_currentCharacter}]:{dirtyMark}";
 
+            var aliases = LoadAliases();
             for (var i = 0; i < c.AvailableVariants.Count; i++)
             {
                 var v = c.AvailableVariants[i];
-                _opt.AddItem(v, i);
+                var displayText = string.Equals(v, "default", StringComparison.OrdinalIgnoreCase)
+                    ? v
+                    : AliasService.Resolve(v, aliases);
+                _opt.AddItem(displayText, i);
+                _opt.SetItemMetadata(i, v);
                 if (string.Equals(v, effectiveActive, StringComparison.OrdinalIgnoreCase))
                 {
                     _opt.Selected = i;
                 }
             }
+            UpdateVariantEditBtnState(effectiveActive);
             MainFile.Logger.Info($"OptionButton populated for '{_currentCharacter}': {c.AvailableVariants.Count} items, effective='{effectiveActive}' (disk='{c.Active}', boot='{bootActive}')");
             UpdatePreview(effectiveActive);
         }
@@ -999,7 +1283,11 @@ public static class SkinSelectorOverlay
         try
         {
             if (_opt == null) return;
-            var chosen = _opt.GetItemText((int)index);
+            // GetItemText returns the display label (which may be an alias); GetItemMetadata
+            // returns the underlying ModId we stored at AddItem time. We always match on the
+            // ModId so aliases stay purely cosmetic.
+            var meta = _opt.GetItemMetadata((int)index);
+            var chosen = meta.VariantType == Variant.Type.String ? meta.AsString() : _opt.GetItemText((int)index);
             MainFile.Logger.Info($"  chosen='{chosen}' for character='{_currentCharacter}'");
             if (string.IsNullOrEmpty(chosen) || chosen.StartsWith("("))
             {

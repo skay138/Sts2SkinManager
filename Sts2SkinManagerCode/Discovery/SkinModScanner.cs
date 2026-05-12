@@ -33,6 +33,22 @@ public static class SkinModScanner
         RegexOptions.IgnoreCase | RegexOptions.Compiled
     );
 
+    // Reads `animations/characters/{char}/` from the base game pck so we can tell
+    // "skin for an existing character" apart from "mod that adds a brand-new character".
+    // Touching only the raw bytes here keeps us clear of ModelDb.AllCharacters caching/Harmony timing.
+    public static HashSet<string> ScanBaseCharacters(string gameDir)
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var basePck = Path.Combine(gameDir, "SlayTheSpire2.pck");
+        if (!File.Exists(basePck)) return result;
+        foreach (var p in PckPathReader.ReadAsciiRuns(basePck))
+        {
+            var m = CharacterPathRegex.Match(p);
+            if (m.Success) result.Add(m.Groups[1].Value.ToLowerInvariant());
+        }
+        return result;
+    }
+
     // Probed in order; first hit wins.
     private static readonly string[] PreviewCandidateNames =
     {
@@ -40,9 +56,10 @@ public static class SkinModScanner
         "thumbnail.png", "thumbnail.jpg", "thumbnail.jpeg", "thumbnail.webp",
     };
 
-    public static List<DetectedSkinMod> Scan(string modsDir)
+    public static List<DetectedSkinMod> Scan(string modsDir, IReadOnlySet<string> baseCharacters, out List<string> skippedCustomCharacterMods)
     {
         var result = new List<DetectedSkinMod>();
+        skippedCustomCharacterMods = new List<string>();
         if (!Directory.Exists(modsDir)) return result;
 
         foreach (var modDir in Directory.EnumerateDirectories(modsDir))
@@ -70,7 +87,19 @@ public static class SkinModScanner
                 var pckId = Path.GetFileNameWithoutExtension(pck);
                 if (chars.Count > 0)
                 {
-                    result.Add(new DetectedSkinMod(pckId, modDir, pck, SkinModKind.Character, chars.ToList(), previewPath));
+                    // A mod that targets ONLY characters not in the base roster is adding a brand-new
+                    // character, not skinning an existing one. Skip so its pck stays auto-mountable —
+                    // otherwise our LoadResourcePack intercept would strand the character mod.
+                    // Skip only when base whitelist is non-empty (empty = base pck couldn't be read; fall through).
+                    var baseHits = baseCharacters.Count == 0
+                        ? chars
+                        : chars.Where(c => baseCharacters.Contains(c)).ToHashSet();
+                    if (baseHits.Count == 0)
+                    {
+                        skippedCustomCharacterMods.Add($"{pckId} → [{string.Join(",", chars)}]");
+                        continue;
+                    }
+                    result.Add(new DetectedSkinMod(pckId, modDir, pck, SkinModKind.Character, baseHits.ToList(), previewPath));
                 }
                 else if (isCardMod)
                 {

@@ -35,6 +35,10 @@ public class SkinChoicesConfig
 
     public CardPacksConfig CardPacks { get; set; } = new();
 
+    // modId → user-chosen alias. modId stays the unique key; alias is display-only.
+    // Stale entries (mods no longer detected) get pruned in SyncAliases.
+    public Dictionary<string, string> Aliases { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         WriteIndented = true,
@@ -67,6 +71,13 @@ public class SkinChoicesConfig
                 cfg.CardPacks.Schema = 2;
             }
 
+            if (root.TryGetPropertyValue("_aliases", out var aliasesNode) && aliasesNode != null)
+            {
+                var deserialized = JsonSerializer.Deserialize<Dictionary<string, string>>(aliasesNode.ToJsonString(), JsonOpts);
+                if (deserialized != null) cfg.Aliases = new Dictionary<string, string>(deserialized, StringComparer.OrdinalIgnoreCase);
+                root.Remove("_aliases");
+            }
+
             root.Remove("_preview_visible"); // legacy v0.4.0-dev key, ignored
 
             cfg.Characters = JsonSerializer.Deserialize<Dictionary<string, CharacterSkinChoice>>(root.ToJsonString(), JsonOpts) ?? new(StringComparer.OrdinalIgnoreCase);
@@ -92,7 +103,21 @@ public class SkinChoicesConfig
         var cardPacksNode = JsonNode.Parse(JsonSerializer.Serialize(CardPacks, JsonOpts));
         if (cardPacksNode != null) root["_card_packs"] = cardPacksNode;
 
+        if (Aliases.Count > 0)
+        {
+            var aliasNode = JsonNode.Parse(JsonSerializer.Serialize(Aliases, JsonOpts));
+            if (aliasNode != null) root["_aliases"] = aliasNode;
+        }
+
         File.WriteAllText(path, root.ToJsonString(JsonOpts));
+    }
+
+    // Drops alias entries whose modId is no longer present in the detected set.
+    public void SyncAliases(IEnumerable<string> detectedModIds)
+    {
+        var keep = new HashSet<string>(detectedModIds, StringComparer.OrdinalIgnoreCase);
+        var stale = Aliases.Keys.Where(k => !keep.Contains(k)).ToList();
+        foreach (var k in stale) Aliases.Remove(k);
     }
 
     public void SyncAvailableVariants(string character, IEnumerable<string> variants)

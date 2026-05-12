@@ -48,9 +48,18 @@ public partial class MainFile : Node
         var managerDataDir = Path.Combine(userDataDir, ModId);
         Directory.CreateDirectory(managerDataDir);
 
-        var detected = SkinModScanner.Scan(modsDir);
+        var baseCharacters = SkinModScanner.ScanBaseCharacters(gameDir);
+        Logger.Info($"base character roster ({baseCharacters.Count}): [{string.Join(", ", baseCharacters.OrderBy(x => x))}]");
+
+        var detected = SkinModScanner.Scan(modsDir, baseCharacters, out var skippedCustom);
         var characterMods = detected.Where(d => d.Kind == SkinModKind.Character).ToList();
         var cardMods = detected.Where(d => d.Kind == SkinModKind.Cards).ToList();
+
+        if (skippedCustom.Count > 0)
+        {
+            Logger.Info($"skipped {skippedCustom.Count} custom-character mod(s) — not in base roster, leaving auto-mount intact:");
+            foreach (var s in skippedCustom) Logger.Info($"  [skip] {s}");
+        }
 
         Logger.Info($"detected {characterMods.Count} character skin pck(s), {cardMods.Count} card pack pck(s):");
         foreach (var d in characterMods)

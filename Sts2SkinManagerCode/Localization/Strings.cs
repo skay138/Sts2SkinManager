@@ -43,6 +43,13 @@ public static class Strings
             ["discard_changes"] = "Discard",
             ["preview_unavailable"] = "no preview",
             ["preview_toggle_tooltip"] = "Toggle skin preview",
+            ["alias_edit_tooltip"] = "Rename display label",
+            ["alias_placeholder"] = "Display name (blank = use mod ID)",
+            ["alias_save_tooltip"] = "Save name",
+            ["alias_cancel_tooltip"] = "Cancel",
+            ["alias_dup_modid"] = "Name conflicts with an existing mod ID",
+            ["alias_dup_alias"] = "Another mod already uses this name",
+            ["alias_same_as_own"] = "Same as the mod ID — leave blank to use it",
         },
         ["KOR"] = new()
         {
@@ -58,6 +65,13 @@ public static class Strings
             ["discard_changes"] = "되돌리기",
             ["preview_unavailable"] = "미리보기 없음",
             ["preview_toggle_tooltip"] = "스킨 미리보기 토글",
+            ["alias_edit_tooltip"] = "표시 이름 변경",
+            ["alias_placeholder"] = "표시 이름 (비우면 mod ID 사용)",
+            ["alias_save_tooltip"] = "이름 저장",
+            ["alias_cancel_tooltip"] = "취소",
+            ["alias_dup_modid"] = "다른 mod ID 와 겹쳐요",
+            ["alias_dup_alias"] = "다른 mod 가 이미 쓰는 이름이에요",
+            ["alias_same_as_own"] = "mod ID 와 같아요 — 비우면 그대로 사용",
         },
         ["JPN"] = new()
         {
