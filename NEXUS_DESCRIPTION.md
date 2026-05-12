@@ -1,24 +1,28 @@
 # Sts2 Skin Manager — Nexus Mods listing
 
 ## Short description (one-liner)
-Manage installed character skin mods and card skin mods from one in-game panel — no folder shuffling.
+Manage character skin, card skin, and mixed (spine + extras) mods from one in-game panel — hover preview, inline rename, toggle, reorder. Wrapped in a collapsible toggle so it stays out of the way.
 
 ## Long description (paste into Nexus Mods description box)
 
 [size=4][b]What this does[/b][/size]
 
-Slay the Spire 2's modding scene has plenty of character skins (Mesugaki for Regent, Booba for Necrobinder, ...) and card-art / portrait reskins. If you have several installed, normally only one wins or you have to shuffle folders. Sts2 Skin Manager lets you keep them all installed and switch them on/off from the Character Select screen.
+Slay the Spire 2's modding scene has plenty of character skins (Mesugaki for Regent, Booba for Necrobinder, ...), card-art / portrait reskins, and bundles that ship a character spine together with card art (e.g. AncientWaifus). If you have several installed, normally only one wins or you have to shuffle folders. Sts2 Skin Manager lets you keep them all installed and switch them on/off — or combine the parts you like from each — from the Character Select screen.
 
 [size=4][b]Features[/b][/size]
 
 [list]
 [*] [b]Auto-detection[/b] — any skin mod whose [color=#ffcc00].pck[/color] overrides character spine paths or card art/portraits is picked up automatically. No registration, no compatibility file.
-[*] [b]Character skin dropdown[/b] — pick which variant is active per character right on Character Select.
-[*] [b]Card skin panel[/b] — toggle multiple card-skin packs at once, reorder priority (top wins for overlapping cards) by drag-and-drop or arrow buttons.
-[*] [b]Batch Save / Discard[/b] — make a pile of changes, click Save once, restart once.
-[*] [b]Auto-relaunch via Steam[/b] — confirm and the mod restarts STS2 through Steam in the background.
-[*] [b]Cancel-friendly[/b] — modal cancel keeps your changes queued for next launch; Discard rolls everything back to the boot state.
-[*] [b]Multi-language UI[/b] — follows the game's current language. 16 languages, English fallback.
+[*] [b]Character skin dropdown[/b] — pick which variant is active per character right on Character Select. Mixed mods (spine + extras bundled) get a [color=#ffcc00]📦[/color] indicator + per-item tooltip.
+[*] [b]Card skin panel[/b] — toggle multiple card-skin packs at once, reorder priority (top wins for overlapping cards) by drag-and-drop or ↑/↓ arrows, with explicit order numbers and a ✓/✗ status icon per row.
+[*] [b]Mixed mods panel (new in v0.6.0)[/b] — for mods that bundle a character spine with card art / event scenes. Toggle them independently in their own tab to layer the extras on top of a different main-spine pick. Example: pick Mesugaki for the spine, toggle AncientWaifus here for its card art — the dropdown's spine always wins overlapping paths.
+[*] [b]Collapsible Skin Manager toggle[/b] — the whole UI lives inside a single [color=#ffcc00]▶ Skin manager[/color] toggle, collapsed by default so the Character Select screen stays clean. Save / Discard stay alongside the toggle regardless of body state.
+[*] [b]Tabbed inner layout[/b] — Card skins and Mixed mods are tabs inside one panel — only one row list visible at a time with a generous content area when expanded.
+[*] [b]Hover preview[/b] — see what a skin looks like [i]before[/i] committing. Hover the 👁 icon beside the character dropdown, or hover a card-skin row's label. Reads [color=#ffcc00]preview.png[/color] (or .jpg / .webp) shipped next to the [color=#ffcc00].pck[/color] if the author provided one; otherwise auto-extracts a sensible default from the [color=#ffcc00].pck[/color] (character-select art for characters, first card art for card packs). No live spine swap, no game state mutation.
+[*] [b]Rename mods inline[/b] — give any character variant or card skin a friendly display name. Click ✏️, type, ✓ to save (or Enter), ✕ to cancel. The mod ID stays as the unique key under the hood; aliases never break matching. Collisions with other IDs/aliases are rejected inline with a red highlight and tooltip.
+[*] [b]Unified Save / Discard[/b] — every panel shares a single Save button. Make any combination of changes, click Save once, one modal, one restart. Discard rolls everything back to the boot state.
+[*] [b]Auto-restart via Steam[/b] — confirm the modal and the mod relaunches STS2 through Steam (~5-10s). Cancel keeps your changes queued for next launch.
+[*] [b]Multi-language UI[/b] — follows the game's current language. 16 locales bundled, English fallback.
 [/list]
 
 [size=4][b]Installation[/b][/size]
@@ -33,6 +37,10 @@ Slay the Spire 2's modding scene has plenty of character skins (Mesugaki for Reg
 [size=4][b]Compatibility[/b][/size]
 
 Any character skin mod that overrides paths under [color=#ffcc00]res://animations/characters/{characterId}/[/color], and any card-art / portrait mod that overrides [color=#ffcc00]card_art/...[/color] or ships [color=#ffcc00]card_portraits/[/color]. Mod authors don't need to do anything special.
+
+[b]Plays nicely with custom-character mods.[/b] Mods that add brand-new characters (e.g. Ryoshu) share the [color=#ffcc00]animations/characters/{char}/[/color] path pattern with skin mods, so an earlier build would intercept their [color=#ffcc00].pck[/color] and the new character would disappear from Character Select. SkinManager now reads the base-game roster from [color=#ffcc00]SlayTheSpire2.pck[/color] and only manages mods that target a [i]base[/i] character — custom characters stay auto-mountable, no conflict.
+
+[b]For skin authors[/b] — drop a [color=#ffcc00]preview.png[/color] (or .jpg / .jpeg / .webp) next to your [color=#ffcc00].pck[/color] and the manager will use it for hover preview. Optional — the manager auto-extracts one from the [color=#ffcc00].pck[/color] if you don't ship one.
 
 [size=4][b]Limitations[/b][/size]
 
@@ -56,7 +64,7 @@ MIT licensed. Bug reports and pull requests welcome.
 - Tools for Modders
 
 ## Tags
-sts2, skin manager, character skin, card skin, card portraits, mod manager, ui mod, runtime switch, steam restart
+sts2, skin manager, character skin, card skin, card portraits, mod manager, ui mod, hover preview, rename, runtime switch, steam restart
 
 ## Required mods
 None. Works standalone.

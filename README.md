@@ -1,6 +1,6 @@
 # Sts2SkinManager
 
-A Slay the Spire 2 mod that lets you manage installed **character skin mods** and **card skin mods** (card portraits / card art) from one in-game panel on the Character Select screen.
+A Slay the Spire 2 mod that manages installed **character skin mods**, **card skin mods** (card portraits / card art), and **mixed mods** (a character spine + card art bundled in one `.pck`) from one in-game panel on the Character Select screen. The whole UI lives inside a collapsible **Skin Manager** toggle so it stays out of the way until you need it.
 
 🇰🇷 [한국어 README](README.ko.md) · 📦 [Nexus Mods page](https://www.nexusmods.com/slaythespire2/mods/866)
 
@@ -8,12 +8,14 @@ A Slay the Spire 2 mod that lets you manage installed **character skin mods** an
 
 ## Features
 
-- **Auto-detection** — scans `<sts2>/mods/*/` and detects:
+- **Auto-detection** — scans `<sts2>/mods/*/` and detects three kinds:
   - **Character skin mods** — `.pck` files containing `res://animations/characters/{character}/...` paths
   - **Card skin mods** — `.pck` files overriding `card_art/...` or shipping `card_portraits/`
-- **In-game UI** on Character Select:
-  - **Character skin dropdown** — pick which variant is active per character
-  - **Card skin panel** — toggle individual packs, reorder priority (top wins for overlapping cards), drag-and-drop or ↑/↓ arrows
+  - **Mixed mods** — `.pck` files that bundle a character spine with card art / event scenes (e.g. AncientWaifus)
+- **Collapsible Skin Manager toggle** wraps everything — default collapsed so Character Select stays clean. Save / Discard stay alongside the toggle regardless of body state. Inside, tabs switch between:
+  - **Character skin dropdown** — pick which variant is active per character. Mixed mods get a `📦` indicator + per-item tooltip
+  - **Card skin tab** — toggle individual packs, reorder priority (top wins for overlapping cards), drag-and-drop or ↑/↓ arrows
+  - **Mixed mods tab** — toggle mixed mods independently of the dropdown choice. Layer their extras (cards, events) on top of a different main-spine pick; the dropdown's spine always wins overlapping paths
 - **Skin preview on hover** — see what a skin looks like *before* committing:
   - Character skin → hover the 👁 icon beside the dropdown
   - Card skin → hover the row's label
