@@ -128,6 +128,7 @@ public partial class MainFile : Node
         _watcher.Start();
 
         SkinSelectorOverlay.Configure(choicesPath, byCharacter, cardMods);
+        SkinSelectorOverlay.SetWatcher(_watcher);
     }
 
     private static ChoicesFileWatcher? _watcher;

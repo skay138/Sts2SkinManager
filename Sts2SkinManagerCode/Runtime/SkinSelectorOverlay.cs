@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Godot;
 using MegaCrit.Sts2.Core.Localization;
@@ -20,9 +21,26 @@ public static class SkinSelectorOverlay
     private static Control? _hbox;
     private static VBoxContainer? _cardPackVBox;
     private static Button? _cardPackHeaderBtn;
+    private static Button? _cardPackSaveBtn;
+    private static Button? _cardPackDiscardBtn;
     private static ScrollContainer? _cardPackScroll;
     private static VBoxContainer? _cardPackRows;
     private static bool _cardPackExpanded = true;
+
+    // Pending (in-memory) state shared by character dropdown + card pack panel.
+    // Mutations here don't touch disk; OnSave commits to choices.json and triggers the modal.
+    private static CardPacksConfig? _pendingCardPacks;
+    private static readonly Dictionary<string, string> _pendingActiveByCharacter = new(StringComparer.OrdinalIgnoreCase);
+
+    // Boot snapshot — what the game actually has loaded right now. dirty = (effective state != boot snapshot).
+    // Stays dirty until the user restarts (which re-captures the snapshot). OnDiscard restores everything to this.
+    private static CardPacksConfig? _bootSnapshotCardPacks;
+    private static readonly Dictionary<string, string> _bootSnapshotActive = new(StringComparer.OrdinalIgnoreCase);
+
+    // Set by MainFile after the watcher is constructed; OnDiscard calls NoteSavedAsApplied()
+    // so the post-discard disk write doesn't trigger a phantom restart modal.
+    private static ChoicesFileWatcher? _watcher;
+    public static void SetWatcher(ChoicesFileWatcher w) => _watcher = w;
 
     private static Node? _lastScreen;
     private static string _currentCharacter = "";
@@ -35,6 +53,13 @@ public static class SkinSelectorOverlay
         _choicesPath = choicesPath;
         _byCharacter = byCharacter;
         _cardMods = cardMods;
+
+        var initial = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
+        _pendingCardPacks = ClonePacks(initial.CardPacks);
+        _bootSnapshotCardPacks = ClonePacks(initial.CardPacks);
+        _bootSnapshotActive.Clear();
+        foreach (var kv in initial.Characters) _bootSnapshotActive[kv.Key] = kv.Value.Active ?? "default";
+        _pendingActiveByCharacter.Clear();
     }
 
     public static void Attach(Node screen)
@@ -95,14 +120,39 @@ public static class SkinSelectorOverlay
         };
         _cardPackVBox = vbox;
 
-        var headerBtn = new Button
+        var headerHbox = new HBoxContainer
         {
             CustomMinimumSize = new Vector2(480, 32),
+        };
+
+        var headerBtn = new Button
+        {
+            CustomMinimumSize = new Vector2(280, 32),
             Alignment = HorizontalAlignment.Left,
         };
         _cardPackHeaderBtn = headerBtn;
         headerBtn.Pressed += ToggleCardPackExpanded;
-        vbox.AddChild(headerBtn);
+        headerHbox.AddChild(headerBtn);
+
+        var saveBtn = new Button
+        {
+            Text = Strings.Get("save_changes"),
+            CustomMinimumSize = new Vector2(90, 32),
+        };
+        _cardPackSaveBtn = saveBtn;
+        saveBtn.Pressed += OnSave;
+        headerHbox.AddChild(saveBtn);
+
+        var discardBtn = new Button
+        {
+            Text = Strings.Get("discard_changes"),
+            CustomMinimumSize = new Vector2(90, 32),
+        };
+        _cardPackDiscardBtn = discardBtn;
+        discardBtn.Pressed += OnDiscard;
+        headerHbox.AddChild(discardBtn);
+
+        vbox.AddChild(headerHbox);
 
         var scroll = new ScrollContainer
         {
@@ -148,11 +198,24 @@ public static class SkinSelectorOverlay
     private static void UpdateCardPackHeader()
     {
         if (_cardPackHeaderBtn == null || !GodotObject.IsInstanceValid(_cardPackHeaderBtn)) return;
-        var choices = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
-        var total = choices.CardPacks.Ordering.Count;
-        var enabled = choices.CardPacks.Enabled.Count(kv => kv.Value);
+        var pending = _pendingCardPacks ?? new CardPacksConfig();
+        var total = pending.Ordering.Count;
+        var enabled = pending.Enabled.Count(kv => kv.Value);
         var arrow = _cardPackExpanded ? "▼" : "▶";
-        _cardPackHeaderBtn.Text = $"{arrow}  {Strings.Get("card_packs_header")} ({enabled}/{total})";
+        var dirty = IsAnyDirty();
+        var dirtyMark = dirty ? " *" : "";
+        _cardPackHeaderBtn.Text = $"{arrow}  {Strings.Get("card_packs_header")} ({enabled}/{total}){dirtyMark}";
+
+        if (_cardPackSaveBtn != null && GodotObject.IsInstanceValid(_cardPackSaveBtn))
+        {
+            _cardPackSaveBtn.Disabled = !dirty;
+            _cardPackSaveBtn.Text = Strings.Get("save_changes");
+        }
+        if (_cardPackDiscardBtn != null && GodotObject.IsInstanceValid(_cardPackDiscardBtn))
+        {
+            _cardPackDiscardBtn.Disabled = !dirty;
+            _cardPackDiscardBtn.Text = Strings.Get("discard_changes");
+        }
     }
 
     private static void BuildCardPackRows()
@@ -166,11 +229,11 @@ public static class SkinSelectorOverlay
             child.QueueFree();
         }
 
-        var choices = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
-        for (var i = 0; i < choices.CardPacks.Ordering.Count; i++)
+        var packs = _pendingCardPacks ?? new CardPacksConfig();
+        for (var i = 0; i < packs.Ordering.Count; i++)
         {
-            var modId = choices.CardPacks.Ordering[i];
-            var row = BuildCardPackRow(modId, choices.CardPacks, i, choices.CardPacks.Ordering.Count);
+            var modId = packs.Ordering[i];
+            var row = BuildCardPackRow(modId, packs, i, packs.Ordering.Count);
             _cardPackRows.AddChild(row);
         }
         UpdateCardPackHeader();
@@ -178,16 +241,37 @@ public static class SkinSelectorOverlay
 
     private static Control BuildCardPackRow(string modId, CardPacksConfig packs, int index, int total)
     {
-        var hbox = new HBoxContainer();
+        var hbox = new CardPackRow
+        {
+            ModId = modId,
+            MouseFilter = Control.MouseFilterEnum.Pass,
+            MouseDefaultCursorShape = Control.CursorShape.Move,
+        };
         var enabled = packs.Enabled.TryGetValue(modId, out var e) ? e : true;
+
+        var dragHandle = new Label
+        {
+            Text = "⋮⋮",
+            CustomMinimumSize = new Vector2(20, 32),
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        hbox.AddChild(dragHandle);
 
         var check = new CheckBox
         {
             ButtonPressed = enabled,
             CustomMinimumSize = new Vector2(32, 32),
         };
-        check.Toggled += isOn => OnCardPackToggle(modId, isOn);
         hbox.AddChild(check);
+
+        var status = new Label
+        {
+            CustomMinimumSize = new Vector2(28, 32),
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        hbox.AddChild(status);
 
         var orderLabel = new Label
         {
@@ -201,10 +285,27 @@ public static class SkinSelectorOverlay
         var label = new Label
         {
             Text = modId,
-            CustomMinimumSize = new Vector2(308, 32),
+            CustomMinimumSize = new Vector2(280, 32),
             VerticalAlignment = VerticalAlignment.Center,
         };
         hbox.AddChild(label);
+
+        void ApplyVisual(bool isOn)
+        {
+            status.Text = isOn ? "✓" : "✗";
+            status.Modulate = isOn ? new Color(0.4f, 0.95f, 0.45f) : new Color(0.95f, 0.45f, 0.45f);
+            check.Modulate = isOn ? new Color(0.6f, 1.0f, 0.6f) : new Color(0.55f, 0.55f, 0.55f);
+            label.Modulate = isOn ? Colors.White : new Color(0.55f, 0.55f, 0.55f);
+            dragHandle.Modulate = isOn ? Colors.White : new Color(0.55f, 0.55f, 0.55f);
+            orderLabel.Modulate = isOn ? Colors.White : new Color(0.55f, 0.55f, 0.55f);
+        }
+        ApplyVisual(enabled);
+
+        check.Toggled += isOn =>
+        {
+            OnCardPackToggle(modId, isOn);
+            ApplyVisual(isOn);
+        };
 
         var upBtn = new Button
         {
@@ -231,12 +332,12 @@ public static class SkinSelectorOverlay
     {
         try
         {
-            var choices = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
-            var current = choices.CardPacks.Enabled.TryGetValue(modId, out var c) ? c : true;
+            _pendingCardPacks ??= ClonePacks(SkinChoicesConfig.LoadOrEmpty(_choicesPath).CardPacks);
+            var current = _pendingCardPacks.Enabled.TryGetValue(modId, out var c) ? c : true;
             if (current == isOn) return;
-            choices.CardPacks.Enabled[modId] = isOn;
-            choices.Save(_choicesPath);
-            MainFile.Logger.Info($"card pack toggle: {modId} → {isOn}");
+            _pendingCardPacks.Enabled[modId] = isOn;
+            MainFile.Logger.Info($"card pack pending toggle: {modId} → {isOn}");
+            UpdateCardPackHeader();
         }
         catch (Exception ex) { MainFile.Logger.Warn($"card pack toggle error: {ex.Message}"); }
     }
@@ -245,25 +346,151 @@ public static class SkinSelectorOverlay
     {
         try
         {
-            var choices = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
-            var idx = choices.CardPacks.Ordering.IndexOf(modId);
+            _pendingCardPacks ??= ClonePacks(SkinChoicesConfig.LoadOrEmpty(_choicesPath).CardPacks);
+            var idx = _pendingCardPacks.Ordering.IndexOf(modId);
             if (idx < 0) return;
             var newIdx = idx + delta;
-            if (newIdx < 0 || newIdx >= choices.CardPacks.Ordering.Count) return;
+            if (newIdx < 0 || newIdx >= _pendingCardPacks.Ordering.Count) return;
 
-            var item = choices.CardPacks.Ordering[idx];
-            choices.CardPacks.Ordering.RemoveAt(idx);
-            choices.CardPacks.Ordering.Insert(newIdx, item);
-            choices.Save(_choicesPath);
-            MainFile.Logger.Info($"card pack reorder: {modId} moved to index {newIdx}");
+            var item = _pendingCardPacks.Ordering[idx];
+            _pendingCardPacks.Ordering.RemoveAt(idx);
+            _pendingCardPacks.Ordering.Insert(newIdx, item);
+            MainFile.Logger.Info($"card pack pending reorder: {modId} → index {newIdx}");
             Callable.From(BuildCardPackRows).CallDeferred();
         }
         catch (Exception ex) { MainFile.Logger.Warn($"card pack reorder error: {ex.Message}"); }
     }
 
+    public static void HandleDragDropReorder(string sourceModId, string targetModId, bool insertAbove)
+    {
+        try
+        {
+            _pendingCardPacks ??= ClonePacks(SkinChoicesConfig.LoadOrEmpty(_choicesPath).CardPacks);
+            var srcIdx = _pendingCardPacks.Ordering.IndexOf(sourceModId);
+            var targetIdx = _pendingCardPacks.Ordering.IndexOf(targetModId);
+            if (srcIdx < 0 || targetIdx < 0 || srcIdx == targetIdx) return;
+
+            var insertIdx = insertAbove ? targetIdx : targetIdx + 1;
+            var item = _pendingCardPacks.Ordering[srcIdx];
+            _pendingCardPacks.Ordering.RemoveAt(srcIdx);
+            if (srcIdx < insertIdx) insertIdx--;
+            if (insertIdx < 0) insertIdx = 0;
+            if (insertIdx > _pendingCardPacks.Ordering.Count) insertIdx = _pendingCardPacks.Ordering.Count;
+            _pendingCardPacks.Ordering.Insert(insertIdx, item);
+
+            MainFile.Logger.Info($"card pack drag-drop: {sourceModId} → {(insertAbove ? "above" : "below")} {targetModId} (idx {insertIdx})");
+            Callable.From(BuildCardPackRows).CallDeferred();
+        }
+        catch (Exception ex) { MainFile.Logger.Warn($"drag-drop reorder error: {ex.Message}"); }
+    }
+
+    private static void OnSave()
+    {
+        try
+        {
+            if (!IsAnyDirty())
+            {
+                MainFile.Logger.Info("save clicked but no pending changes (vs boot snapshot)");
+                return;
+            }
+            var choices = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
+            foreach (var kv in _pendingActiveByCharacter)
+            {
+                if (choices.Characters.TryGetValue(kv.Key, out var c)) c.Active = kv.Value;
+            }
+            if (_pendingCardPacks != null) choices.CardPacks = ClonePacks(_pendingCardPacks);
+            choices.Save(_choicesPath);
+            _pendingActiveByCharacter.Clear();
+
+            MainFile.Logger.Info("save → choices.json updated (watcher may also fire; ShowOrReset will dedupe)");
+            UpdateCardPackHeader();
+
+            // Show modal directly so this doesn't depend on the file watcher firing.
+            // The watcher may also call ShowOrReset; the second call just resets the countdown.
+            var managerDataDir = Path.GetDirectoryName(_choicesPath);
+            if (!string.IsNullOrEmpty(managerDataDir))
+            {
+                RestartCountdownModal.ShowOrReset(managerDataDir, 10, () => { });
+            }
+        }
+        catch (Exception ex) { MainFile.Logger.Warn($"OnSave error: {ex.Message}"); }
+    }
+
+    private static void OnDiscard()
+    {
+        try
+        {
+            if (_bootSnapshotCardPacks == null) return;
+            _pendingActiveByCharacter.Clear();
+            _pendingCardPacks = ClonePacks(_bootSnapshotCardPacks);
+
+            var choices = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
+            foreach (var kv in _bootSnapshotActive)
+            {
+                if (choices.Characters.TryGetValue(kv.Key, out var c)) c.Active = kv.Value;
+            }
+            choices.CardPacks = ClonePacks(_bootSnapshotCardPacks);
+            choices.Save(_choicesPath);
+
+            // Restore settings.save card-pack state too so the next launch matches boot.
+            var userDataDir = OS.GetUserDataDir();
+            var settings = Sts2SettingsWriter.FindAndLoad(userDataDir);
+            if (settings != null && _cardMods.Count > 0)
+            {
+                CardPackApplier.ApplyToSettings(settings, _bootSnapshotCardPacks, _cardMods);
+                CardPackApplier.ApplyToMemoryModList(_bootSnapshotCardPacks);
+                Sts2SettingsWriter.Save(settings);
+            }
+
+            // Tell watcher the new disk state is the applied state so its imminent fire is a no-op.
+            _watcher?.NoteSavedAsApplied();
+
+            MainFile.Logger.Info("discard → all changes reverted to boot snapshot (disk + settings + pending)");
+            Callable.From(() =>
+            {
+                BuildCardPackRows();
+                RefreshItems();
+            }).CallDeferred();
+        }
+        catch (Exception ex) { MainFile.Logger.Warn($"OnDiscard error: {ex.Message}"); }
+    }
+
+    private static bool IsAnyDirty()
+    {
+        if (_bootSnapshotCardPacks == null) return false;
+
+        var pending = _pendingCardPacks ?? new CardPacksConfig();
+        if (!pending.Ordering.SequenceEqual(_bootSnapshotCardPacks.Ordering, StringComparer.OrdinalIgnoreCase)) return true;
+        if (pending.Enabled.Count != _bootSnapshotCardPacks.Enabled.Count) return true;
+        foreach (var kv in pending.Enabled)
+        {
+            if (!_bootSnapshotCardPacks.Enabled.TryGetValue(kv.Key, out var v) || v != kv.Value) return true;
+        }
+
+        var disk = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
+        foreach (var (character, choice) in disk.Characters)
+        {
+            var bootActive = _bootSnapshotActive.TryGetValue(character, out var b) ? b : choice.Active;
+            var effectiveActive = _pendingActiveByCharacter.TryGetValue(character, out var p) ? p : (choice.Active ?? "default");
+            if (!string.Equals(effectiveActive, bootActive, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
+    }
+
+    private static CardPacksConfig ClonePacks(CardPacksConfig src) => new()
+    {
+        Schema = src.Schema,
+        Ordering = new List<string>(src.Ordering),
+        Enabled = new Dictionary<string, bool>(src.Enabled, StringComparer.OrdinalIgnoreCase),
+    };
+
     public static void RefreshCardPacks()
     {
-        Callable.From(BuildCardPackRows).CallDeferred();
+        Callable.From(() =>
+        {
+            _pendingCardPacks = ClonePacks(SkinChoicesConfig.LoadOrEmpty(_choicesPath).CardPacks);
+            BuildCardPackRows();
+        }).CallDeferred();
     }
 
     private static void EnsureLocaleSubscribed()
@@ -307,6 +534,8 @@ public static class SkinSelectorOverlay
                 _hbox = null;
                 _cardPackVBox = null;
                 _cardPackHeaderBtn = null;
+                _cardPackSaveBtn = null;
+                _cardPackDiscardBtn = null;
                 _cardPackScroll = null;
                 _cardPackRows = null;
                 var mainLoop = Engine.GetMainLoop();
@@ -341,7 +570,14 @@ public static class SkinSelectorOverlay
 
     public static void RefreshDropdown()
     {
-        Callable.From(RefreshItems).CallDeferred();
+        Callable.From(() =>
+        {
+            // External disk change (e.g. user-edited choices.json) — drop any pending in-memory char selection
+            // so the dropdown reflects what's actually on disk.
+            _pendingActiveByCharacter.Clear();
+            RefreshItems();
+            UpdateCardPackHeader();
+        }).CallDeferred();
     }
 
     private static void RefreshItems()
@@ -352,10 +588,10 @@ public static class SkinSelectorOverlay
         {
             _opt.Clear();
             var skinLabel = Strings.Get("skin_label");
-            if (_label != null) _label.Text = $"{skinLabel} [{(string.IsNullOrEmpty(_currentCharacter) ? "—" : _currentCharacter)}]:";
 
             if (_byCharacter == null || !_byCharacter.TryGetValue(_currentCharacter, out var variants) || variants.Count == 0)
             {
+                if (_label != null) _label.Text = $"{skinLabel} [{(string.IsNullOrEmpty(_currentCharacter) ? "—" : _currentCharacter)}]:";
                 _opt.AddItem(Strings.Get("no_variants"));
                 _opt.Disabled = true;
                 return;
@@ -363,21 +599,30 @@ public static class SkinSelectorOverlay
             var choices = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
             if (!choices.Characters.TryGetValue(_currentCharacter, out var c))
             {
+                if (_label != null) _label.Text = $"{skinLabel} [{(string.IsNullOrEmpty(_currentCharacter) ? "—" : _currentCharacter)}]:";
                 _opt.AddItem(Strings.Get("not_configured"));
                 _opt.Disabled = true;
                 return;
             }
             _opt.Disabled = false;
+
+            // pending > disk
+            var effectiveActive = _pendingActiveByCharacter.TryGetValue(_currentCharacter, out var pa) ? pa : (c.Active ?? "default");
+            var bootActive = _bootSnapshotActive.TryGetValue(_currentCharacter, out var b) ? b : effectiveActive;
+            var charDirty = !string.Equals(effectiveActive, bootActive, StringComparison.OrdinalIgnoreCase);
+            var dirtyMark = charDirty ? " *" : "";
+            if (_label != null) _label.Text = $"{skinLabel} [{_currentCharacter}]:{dirtyMark}";
+
             for (var i = 0; i < c.AvailableVariants.Count; i++)
             {
                 var v = c.AvailableVariants[i];
                 _opt.AddItem(v, i);
-                if (string.Equals(v, c.Active, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(v, effectiveActive, StringComparison.OrdinalIgnoreCase))
                 {
                     _opt.Selected = i;
                 }
             }
-            MainFile.Logger.Info($"OptionButton populated for '{_currentCharacter}': {c.AvailableVariants.Count} items, active='{c.Active}'");
+            MainFile.Logger.Info($"OptionButton populated for '{_currentCharacter}': {c.AvailableVariants.Count} items, effective='{effectiveActive}' (disk='{c.Active}', boot='{bootActive}')");
         }
         finally
         {
@@ -423,15 +668,25 @@ public static class SkinSelectorOverlay
                 MainFile.Logger.Warn($"  no choice entry for '{_currentCharacter}'");
                 return;
             }
+
+            // pending tracks "what the user wants" vs. disk.
+            // If equal to disk, remove the pending entry (no-op).
             if (string.Equals(c.Active, chosen, StringComparison.OrdinalIgnoreCase))
             {
-                MainFile.Logger.Info($"  already active, skipping write");
-                return;
+                if (_pendingActiveByCharacter.Remove(_currentCharacter))
+                {
+                    MainFile.Logger.Info($"  pending cleared (matches disk active='{c.Active}')");
+                }
+            }
+            else
+            {
+                _pendingActiveByCharacter[_currentCharacter] = chosen;
+                MainFile.Logger.Info($"  pending set: {_currentCharacter} → {chosen}");
             }
 
-            c.Active = chosen;
-            choices.Save(_choicesPath);
-            MainFile.Logger.Info($"overlay select: {_currentCharacter} → {chosen} (saved; watcher will trigger modal)");
+            // Update label dirty mark + Save/Discard buttons.
+            RefreshItems();
+            UpdateCardPackHeader();
         }
         catch (Exception ex)
         {

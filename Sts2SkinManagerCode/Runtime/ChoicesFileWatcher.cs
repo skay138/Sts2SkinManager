@@ -71,7 +71,6 @@ public sealed class ChoicesFileWatcher : IDisposable
     {
         var fresh = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
         var anyChange = false;
-        var revertActive = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var (character, variants) in _byCharacter)
         {
@@ -82,11 +81,11 @@ public sealed class ChoicesFileWatcher : IDisposable
 
             anyChange = true;
             MainFile.Logger.Info($"character change: {character} '{prevActive}' → '{newActive}'");
-            revertActive[character] = prevActive;
             _appliedActive[character] = newActive;
         }
 
-        var revertCardPacks = Clone(_appliedCardPacks);
+        // Unified Save pattern: changes are explicit (user pressed Save), so modal cancel
+        // does NOT revert the change — it just means "don't restart right now".
         var cardPacksChanged = !CardPacksEqual(fresh.CardPacks, _appliedCardPacks);
         if (cardPacksChanged)
         {
@@ -117,46 +116,26 @@ public sealed class ChoicesFileWatcher : IDisposable
         if (anyChange)
         {
             MainFile.Logger.Info($"showing 10s restart countdown modal");
-            RestartCountdownModal.ShowOrReset(_managerDataDir, 10, () => RevertSnapshot(revertActive, revertCardPacks));
-        }
-    }
-
-    private void RevertSnapshot(Dictionary<string, string> revertActive, CardPacksConfig revertCardPacks)
-    {
-        try
-        {
-            foreach (var kv in revertActive) _appliedActive[kv.Key] = kv.Value;
-            _appliedCardPacks = Clone(revertCardPacks);
-
-            var choices = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
-            foreach (var kv in revertActive)
-            {
-                if (choices.Characters.TryGetValue(kv.Key, out var c))
-                {
-                    MainFile.Logger.Info($"revert character: {kv.Key} → '{kv.Value}'");
-                    c.Active = kv.Value;
-                }
-            }
-            choices.CardPacks = Clone(revertCardPacks);
-            choices.Save(_choicesPath);
-
-            var userDataDir = Godot.OS.GetUserDataDir();
-            var settings = Sts2SettingsWriter.FindAndLoad(userDataDir);
-            if (settings != null)
-            {
-                CardPackApplier.ApplyToSettings(settings, revertCardPacks, _cardMods);
-                CardPackApplier.ApplyToMemoryModList(revertCardPacks);
-                Sts2SettingsWriter.Save(settings);
-                MainFile.Logger.Info($"revert card packs applied to settings");
-            }
-
+            RestartCountdownModal.ShowOrReset(_managerDataDir, 10, () => { /* unified Save pattern: no revert */ });
             SkinSelectorOverlay.RefreshDropdown();
             SkinSelectorOverlay.RefreshCardPacks();
         }
-        catch (Exception ex)
+    }
+
+    // Called by SkinSelectorOverlay.OnDiscard after it has rewritten choices.json to the boot
+    // snapshot. This keeps _applied* aligned with the new disk content so the upcoming watcher
+    // fire sees "no change" and doesn't pop a redundant restart modal.
+    public void NoteSavedAsApplied()
+    {
+        try
         {
-            MainFile.Logger.Warn($"RevertSnapshot error: {ex}");
+            var fresh = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
+            _appliedActive.Clear();
+            foreach (var kv in fresh.Characters) _appliedActive[kv.Key] = kv.Value.Active ?? "default";
+            _appliedCardPacks = Clone(fresh.CardPacks);
+            _lastFireUtc = DateTime.UtcNow.AddMilliseconds(500);
         }
+        catch (Exception ex) { MainFile.Logger.Warn($"NoteSavedAsApplied error: {ex.Message}"); }
     }
 
     private static CardPacksConfig Clone(CardPacksConfig src) => new()
