@@ -1,0 +1,11 @@
+{
+    "id": "Sts2SkinManager",
+    "name": "STS2 Skin Manager",
+    "author": "inggom",
+    "description": "Detect character-skin mods (.pck overrides) and let you switch between variants of the same character. Edit skin_choices.json and restart to apply.",
+    "version": "0.1.0",
+    "has_pck": false,
+    "has_dll": true,
+    "dependencies": [],
+    "affects_gameplay": false
+}

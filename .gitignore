@@ -1,0 +1,21 @@
+# Build outputs
+.godot/
+bin/
+obj/
+*.dll
+*.pdb
+*.user
+
+# Local override (paths, etc.)
+local.props
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.suo
+*.userprefs
+
+# OS
+.DS_Store
+Thumbs.db
