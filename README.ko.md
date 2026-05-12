@@ -4,8 +4,7 @@
 
 🇺🇸 [English README](README.md)
 
-![리젠트 캐릭터 선택 화면 + 한국어 모달](docs/screenshots/character-select-ko.png)
-![Necrobinder character select with English modal](docs/screenshots/character-select-en.png)
+![캐릭터 선택 화면 — 스킨 드롭다운, 카드 스킨 패널, 재시작 모달](docs/screenshots/character-select.png)
 
 ## 기능
 

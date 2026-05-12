@@ -4,8 +4,7 @@ A Slay the Spire 2 mod that lets you manage installed **character skin mods** an
 
 🇰🇷 [한국어 README](README.ko.md)
 
-![Character Select with skin dropdown and restart modal — English](docs/screenshots/character-select-en.png)
-![리젠트 캐릭터 선택 화면 + 한국어 모달](docs/screenshots/character-select-ko.png)
+![Character Select with skin dropdown, card skin panel, and restart modal](docs/screenshots/character-select.png)
 
 ## Features
 
