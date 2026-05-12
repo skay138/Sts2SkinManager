@@ -12,7 +12,8 @@ public record DetectedSkinMod(
     string ModFolder,
     string PckPath,
     SkinModKind Kind,
-    IReadOnlyList<string> Characters
+    IReadOnlyList<string> Characters,
+    string? PreviewPath
 );
 
 public static class SkinModScanner
@@ -32,6 +33,13 @@ public static class SkinModScanner
         RegexOptions.IgnoreCase | RegexOptions.Compiled
     );
 
+    // Probed in order; first hit wins.
+    private static readonly string[] PreviewCandidateNames =
+    {
+        "preview.png", "preview.jpg", "preview.jpeg", "preview.webp",
+        "thumbnail.png", "thumbnail.jpg", "thumbnail.jpeg", "thumbnail.webp",
+    };
+
     public static List<DetectedSkinMod> Scan(string modsDir)
     {
         var result = new List<DetectedSkinMod>();
@@ -41,6 +49,8 @@ public static class SkinModScanner
         {
             var pckFiles = Directory.EnumerateFiles(modDir, "*.pck", SearchOption.TopDirectoryOnly).ToList();
             if (pckFiles.Count == 0) continue;
+
+            var previewPath = FindPreview(modDir);
 
             foreach (var pck in pckFiles)
             {
@@ -60,14 +70,24 @@ public static class SkinModScanner
                 var pckId = Path.GetFileNameWithoutExtension(pck);
                 if (chars.Count > 0)
                 {
-                    result.Add(new DetectedSkinMod(pckId, modDir, pck, SkinModKind.Character, chars.ToList()));
+                    result.Add(new DetectedSkinMod(pckId, modDir, pck, SkinModKind.Character, chars.ToList(), previewPath));
                 }
                 else if (isCardMod)
                 {
-                    result.Add(new DetectedSkinMod(pckId, modDir, pck, SkinModKind.Cards, new List<string>()));
+                    result.Add(new DetectedSkinMod(pckId, modDir, pck, SkinModKind.Cards, new List<string>(), previewPath));
                 }
             }
         }
         return result;
+    }
+
+    private static string? FindPreview(string modDir)
+    {
+        foreach (var name in PreviewCandidateNames)
+        {
+            var candidate = Path.Combine(modDir, name);
+            if (File.Exists(candidate)) return candidate;
+        }
+        return null;
     }
 }

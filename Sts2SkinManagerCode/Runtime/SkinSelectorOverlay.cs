@@ -19,6 +19,16 @@ public static class SkinSelectorOverlay
     private static OptionButton? _opt;
     private static Label? _label;
     private static Control? _hbox;
+    private static Label? _previewHoverIcon;
+    private static Control? _previewContainer;
+    private static TextureRect? _previewRect;
+    private static Label? _previewCaption;
+    private static bool _previewHovered;
+    private static bool _previewAvailable;
+    private static long _previewHoverExitToken;
+    private static string? _hoveredCardModId;
+    private static readonly Dictionary<string, ImageTexture?> _previewCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, ImageTexture?> _cardPreviewCache = new(StringComparer.OrdinalIgnoreCase);
     private static VBoxContainer? _cardPackVBox;
     private static Button? _cardPackHeaderBtn;
     private static Button? _cardPackSaveBtn;
@@ -60,6 +70,7 @@ public static class SkinSelectorOverlay
         _bootSnapshotActive.Clear();
         foreach (var kv in initial.Characters) _bootSnapshotActive[kv.Key] = kv.Value.Active ?? "default";
         _pendingActiveByCharacter.Clear();
+        _previewHovered = false;
     }
 
     public static void Attach(Node screen)
@@ -96,9 +107,28 @@ public static class SkinSelectorOverlay
             _opt.Pressed += () => MainFile.Logger.Info("OptionButton pressed (dropdown opened)");
             hbox.AddChild(_label);
             hbox.AddChild(_opt);
+
+            var hoverIcon = new Label
+            {
+                Text = "👁",
+                CustomMinimumSize = new Vector2(48, 56),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                MouseFilter = Control.MouseFilterEnum.Stop,
+                TooltipText = Strings.Get("preview_toggle_tooltip"),
+                Visible = false,
+            };
+            _previewHoverIcon = hoverIcon;
+            hoverIcon.MouseEntered += OnPreviewHoverStart;
+            hoverIcon.MouseExited += OnPreviewHoverEnd;
+            hbox.AddChild(hoverIcon);
+
             hbox.ZIndex = 1000;
             screen.AddChild(hbox);
             MainFile.Logger.Info($"SkinSelectorOverlay attached (OptionButton) to {screen.Name}");
+
+            BuildPreviewPanel(screen);
+            ApplyPreviewVisibility();
             RefreshItems();
 
             if (_cardMods.Count > 0) BuildCardPackPanel(screen);
@@ -108,6 +138,305 @@ public static class SkinSelectorOverlay
         catch (Exception ex)
         {
             MainFile.Logger.Warn($"overlay attach failed: {ex.Message}");
+        }
+    }
+
+    private static void BuildPreviewPanel(Node screen)
+    {
+        var container = new VBoxContainer
+        {
+            Position = new Vector2(540, 40),
+            CustomMinimumSize = new Vector2(240, 280),
+            MouseFilter = Control.MouseFilterEnum.Stop,
+        };
+        _previewContainer = container;
+        container.MouseEntered += OnPreviewHoverStart;
+        container.MouseExited += OnPreviewHoverEnd;
+
+        var rect = new TextureRect
+        {
+            CustomMinimumSize = new Vector2(240, 240),
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+        };
+        _previewRect = rect;
+        container.AddChild(rect);
+
+        var caption = new Label
+        {
+            CustomMinimumSize = new Vector2(240, 32),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        };
+        _previewCaption = caption;
+        container.AddChild(caption);
+
+        container.ZIndex = 1000;
+        screen.AddChild(container);
+        MainFile.Logger.Info("preview panel attached");
+    }
+
+    private static void UpdatePreview(string variant)
+    {
+        if (_previewRect == null || !GodotObject.IsInstanceValid(_previewRect)) goto finalize;
+        if (_previewCaption == null || !GodotObject.IsInstanceValid(_previewCaption)) goto finalize;
+
+        DetectedSkinMod? mod = null;
+        if (_byCharacter != null && _byCharacter.TryGetValue(_currentCharacter, out var variants))
+        {
+            mod = variants.FirstOrDefault(v => string.Equals(v.ModId, variant, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var bootActive = _bootSnapshotActive.TryGetValue(_currentCharacter, out var b) ? b : "default";
+        var isCurrentActive = string.Equals(variant, bootActive, StringComparison.OrdinalIgnoreCase);
+
+        var tex = isCurrentActive ? null : LoadPreviewTexture(mod, variant);
+        _previewAvailable = tex != null;
+
+        if (_previewAvailable)
+        {
+            _previewRect.Texture = tex;
+            _previewCaption.Text = variant;
+        }
+        else
+        {
+            _previewRect.Texture = null;
+            _previewCaption.Text = "";
+        }
+
+    finalize:
+        if (_previewHoverIcon != null && GodotObject.IsInstanceValid(_previewHoverIcon))
+        {
+            _previewHoverIcon.Visible = _previewAvailable;
+        }
+        if (!_previewAvailable) _previewHovered = false;
+        ApplyPreviewVisibility();
+    }
+
+    private static ImageTexture? LoadPreviewTexture(DetectedSkinMod? mod, string variant)
+    {
+        if (mod == null) return null;
+
+        var cacheKey = $"{mod.PckPath}|{_currentCharacter}";
+        if (_previewCache.TryGetValue(cacheKey, out var cached)) return cached;
+
+        var tex = TryLoadFromConventionFile(mod.PreviewPath) ?? TryLoadFromPckCharSelect(mod.PckPath, _currentCharacter);
+        _previewCache[cacheKey] = tex;
+        return tex;
+    }
+
+    private static ImageTexture? TryLoadFromConventionFile(string? previewPath)
+    {
+        if (string.IsNullOrEmpty(previewPath) || !File.Exists(previewPath)) return null;
+        try
+        {
+            var image = new Image();
+            var err = image.Load(previewPath);
+            if (err != Error.Ok)
+            {
+                MainFile.Logger.Warn($"preview.png load failed: {previewPath} → {err}");
+                return null;
+            }
+            return ImageTexture.CreateFromImage(image);
+        }
+        catch (Exception ex)
+        {
+            MainFile.Logger.Warn($"preview.png load error: {previewPath}: {ex.Message}");
+            return null;
+        }
+    }
+
+    private static ImageTexture? TryLoadFromPckCharSelect(string pckPath, string character)
+    {
+        if (string.IsNullOrEmpty(character)) return null;
+        try
+        {
+            var charLower = character.ToLowerInvariant();
+            var prefix = $".godot/imported/char_select_{charLower}.png-";
+            var ctex = PckFileExtractor.TryReadFirstMatch(pckPath, p =>
+                p.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+                p.EndsWith(".ctex", StringComparison.OrdinalIgnoreCase) &&
+                !p.Contains("_locked", StringComparison.OrdinalIgnoreCase));
+            if (ctex == null)
+            {
+                MainFile.Logger.Info($"no char_select_{charLower} ctex found in {pckPath}");
+                return null;
+            }
+
+            var (fmt, data) = CtexImageExtractor.ExtractEmbedded(ctex);
+            if (data == null || fmt == CtexImageExtractor.CtexFormat.Unknown)
+            {
+                MainFile.Logger.Warn($"could not extract embedded image from ctex in {pckPath}");
+                return null;
+            }
+
+            var image = new Image();
+            var err = fmt == CtexImageExtractor.CtexFormat.Png
+                ? image.LoadPngFromBuffer(data)
+                : image.LoadWebpFromBuffer(data);
+            if (err != Error.Ok)
+            {
+                MainFile.Logger.Warn($"{fmt} decode failed for {pckPath}: {err}");
+                return null;
+            }
+            MainFile.Logger.Info($"loaded {fmt} char_select preview from {Path.GetFileName(pckPath)} ({image.GetWidth()}x{image.GetHeight()})");
+            return ImageTexture.CreateFromImage(image);
+        }
+        catch (Exception ex)
+        {
+            MainFile.Logger.Warn($"pck char_select fallback error for {pckPath}: {ex.Message}");
+            return null;
+        }
+    }
+
+    private static ImageTexture? LoadCardPreviewTexture(string modId)
+    {
+        var mod = _cardMods.FirstOrDefault(m => string.Equals(m.ModId, modId, StringComparison.OrdinalIgnoreCase));
+        if (mod == null) return null;
+
+        var cacheKey = $"card|{mod.PckPath}";
+        if (_cardPreviewCache.TryGetValue(cacheKey, out var cached)) return cached;
+
+        var tex = TryLoadFromConventionFile(mod.PreviewPath) ?? TryLoadFirstCardArt(mod.PckPath);
+        _cardPreviewCache[cacheKey] = tex;
+        return tex;
+    }
+
+    // First card-art .ctex in alphabetical order. Two real-world patterns supported:
+    //   A) base override:   .godot/imported/MegaCrit.Sts2.Core.Models.Cards.{Name}_card_art.png-*.ctex
+    //   B) own namespace:   .godot/imported/{Name}.png-*.ctex   (and not char_select)
+    private static ImageTexture? TryLoadFirstCardArt(string pckPath)
+    {
+        try
+        {
+            var idx = PckFileExtractor.TryReadIndex(pckPath);
+            if (idx == null) return null;
+
+            var sortedKeys = idx.Keys
+                .Where(k => k.StartsWith(".godot/imported/", StringComparison.OrdinalIgnoreCase)
+                            && k.EndsWith(".ctex", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(k => k, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            string? chosen = null;
+            foreach (var k in sortedKeys)
+            {
+                if (k.Contains("MegaCrit.Sts2.Core.Models.Cards.", StringComparison.OrdinalIgnoreCase)
+                    && k.Contains("_card_art", StringComparison.OrdinalIgnoreCase))
+                {
+                    chosen = k;
+                    break;
+                }
+            }
+            if (chosen == null)
+            {
+                foreach (var k in sortedKeys)
+                {
+                    if (k.Contains("char_select", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (k.Contains("characterselect", StringComparison.OrdinalIgnoreCase)) continue;
+                    chosen = k;
+                    break;
+                }
+            }
+            if (chosen == null) { MainFile.Logger.Info($"no card art ctex found in {pckPath}"); return null; }
+
+            var ctex = PckFileExtractor.TryRead(pckPath, idx[chosen]);
+            if (ctex == null) return null;
+
+            var (fmt, data) = CtexImageExtractor.ExtractEmbedded(ctex);
+            if (data == null || fmt == CtexImageExtractor.CtexFormat.Unknown) return null;
+
+            var image = new Image();
+            var err = fmt == CtexImageExtractor.CtexFormat.Png
+                ? image.LoadPngFromBuffer(data)
+                : image.LoadWebpFromBuffer(data);
+            if (err != Error.Ok) return null;
+            MainFile.Logger.Info($"loaded {fmt} card preview from {Path.GetFileName(pckPath)} ({image.GetWidth()}x{image.GetHeight()}): {chosen}");
+            return ImageTexture.CreateFromImage(image);
+        }
+        catch (Exception ex)
+        {
+            MainFile.Logger.Warn($"card art preview load error for {pckPath}: {ex.Message}");
+            return null;
+        }
+    }
+
+    private static void OnCardRowHoverStart(string modId)
+    {
+        _previewHoverExitToken++;
+        _hoveredCardModId = modId;
+        var tex = LoadCardPreviewTexture(modId);
+        _previewAvailable = tex != null;
+        if (_previewRect != null && GodotObject.IsInstanceValid(_previewRect))
+        {
+            _previewRect.Texture = tex;
+        }
+        if (_previewCaption != null && GodotObject.IsInstanceValid(_previewCaption))
+        {
+            _previewCaption.Text = _previewAvailable ? modId : "";
+        }
+        _previewHovered = _previewAvailable;
+        ApplyPreviewVisibility();
+    }
+
+    private static void OnCardRowHoverEnd(string modId)
+    {
+        if (!string.Equals(_hoveredCardModId, modId, StringComparison.OrdinalIgnoreCase)) return;
+        var hbox = _hbox;
+        if (hbox == null || !GodotObject.IsInstanceValid(hbox) || !hbox.IsInsideTree())
+        {
+            _previewHovered = false;
+            _hoveredCardModId = null;
+            ApplyPreviewVisibility();
+            return;
+        }
+        var myToken = ++_previewHoverExitToken;
+        var timer = hbox.GetTree().CreateTimer(0.12);
+        timer.Timeout += () =>
+        {
+            if (_previewHoverExitToken != myToken) return;
+            _previewHovered = false;
+            _hoveredCardModId = null;
+            ApplyPreviewVisibility();
+        };
+    }
+
+    private static void OnPreviewHoverStart()
+    {
+        _previewHoverExitToken++;
+        _previewHovered = true;
+        ApplyPreviewVisibility();
+    }
+
+    // Debounce hide: Godot fires spurious MouseExited when sibling controls toggle visibility
+    // (panel show/hide triggers input pick re-eval). Wait ~120 ms; if a new Enter arrives in
+    // that window, the token mismatches and we keep the panel up. Also covers the 52 px gap
+    // between icon and panel during normal hover-traversal.
+    private static void OnPreviewHoverEnd()
+    {
+        var hbox = _hbox;
+        if (hbox == null || !GodotObject.IsInstanceValid(hbox) || !hbox.IsInsideTree())
+        {
+            _previewHovered = false;
+            ApplyPreviewVisibility();
+            return;
+        }
+        var myToken = ++_previewHoverExitToken;
+        var timer = hbox.GetTree().CreateTimer(0.12);
+        timer.Timeout += () =>
+        {
+            if (_previewHoverExitToken != myToken) return;
+            _previewHovered = false;
+            ApplyPreviewVisibility();
+        };
+    }
+
+    private static void ApplyPreviewVisibility()
+    {
+        if (_previewContainer != null && GodotObject.IsInstanceValid(_previewContainer))
+        {
+            _previewContainer.Visible = _previewHovered && _previewAvailable;
         }
     }
 
@@ -287,7 +616,11 @@ public static class SkinSelectorOverlay
             Text = modId,
             CustomMinimumSize = new Vector2(280, 32),
             VerticalAlignment = VerticalAlignment.Center,
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            TooltipText = Strings.Get("preview_toggle_tooltip"),
         };
+        label.MouseEntered += () => OnCardRowHoverStart(modId);
+        label.MouseExited += () => OnCardRowHoverEnd(modId);
         hbox.AddChild(label);
 
         void ApplyVisual(bool isOn)
@@ -523,6 +856,10 @@ public static class SkinSelectorOverlay
                     {
                         _label.Text = Strings.Get("skin_label") + ":";
                     }
+                    if (_previewHoverIcon != null && GodotObject.IsInstanceValid(_previewHoverIcon))
+                    {
+                        _previewHoverIcon.TooltipText = Strings.Get("preview_toggle_tooltip");
+                    }
                     RefreshItems();
                     BuildCardPackRows();
                     return;
@@ -532,6 +869,11 @@ public static class SkinSelectorOverlay
                 _opt = null;
                 _label = null;
                 _hbox = null;
+                _previewHoverIcon = null;
+                _previewContainer = null;
+                _previewRect = null;
+                _previewCaption = null;
+                _previewHovered = false;
                 _cardPackVBox = null;
                 _cardPackHeaderBtn = null;
                 _cardPackSaveBtn = null;
@@ -594,6 +936,7 @@ public static class SkinSelectorOverlay
                 if (_label != null) _label.Text = $"{skinLabel} [{(string.IsNullOrEmpty(_currentCharacter) ? "—" : _currentCharacter)}]:";
                 _opt.AddItem(Strings.Get("no_variants"));
                 _opt.Disabled = true;
+                UpdatePreview("default");
                 return;
             }
             var choices = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
@@ -602,6 +945,7 @@ public static class SkinSelectorOverlay
                 if (_label != null) _label.Text = $"{skinLabel} [{(string.IsNullOrEmpty(_currentCharacter) ? "—" : _currentCharacter)}]:";
                 _opt.AddItem(Strings.Get("not_configured"));
                 _opt.Disabled = true;
+                UpdatePreview("default");
                 return;
             }
             _opt.Disabled = false;
@@ -623,6 +967,7 @@ public static class SkinSelectorOverlay
                 }
             }
             MainFile.Logger.Info($"OptionButton populated for '{_currentCharacter}': {c.AvailableVariants.Count} items, effective='{effectiveActive}' (disk='{c.Active}', boot='{bootActive}')");
+            UpdatePreview(effectiveActive);
         }
         finally
         {

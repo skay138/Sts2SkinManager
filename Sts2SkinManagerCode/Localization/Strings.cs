@@ -41,6 +41,8 @@ public static class Strings
             ["card_packs_header"] = "Card skins",
             ["save_changes"] = "Save",
             ["discard_changes"] = "Discard",
+            ["preview_unavailable"] = "no preview",
+            ["preview_toggle_tooltip"] = "Toggle skin preview",
         },
         ["KOR"] = new()
         {
@@ -54,6 +56,8 @@ public static class Strings
             ["card_packs_header"] = "카드 스킨",
             ["save_changes"] = "저장",
             ["discard_changes"] = "되돌리기",
+            ["preview_unavailable"] = "미리보기 없음",
+            ["preview_toggle_tooltip"] = "스킨 미리보기 토글",
         },
         ["JPN"] = new()
         {
@@ -67,6 +71,8 @@ public static class Strings
             ["card_packs_header"] = "カードスキン",
             ["save_changes"] = "保存",
             ["discard_changes"] = "破棄",
+            ["preview_unavailable"] = "プレビューなし",
+            ["preview_toggle_tooltip"] = "スキンプレビュー切替",
         },
         ["ZHS"] = new()
         {
@@ -80,6 +86,8 @@ public static class Strings
             ["card_packs_header"] = "卡牌外观",
             ["save_changes"] = "保存",
             ["discard_changes"] = "丢弃",
+            ["preview_unavailable"] = "无预览",
+            ["preview_toggle_tooltip"] = "切换皮肤预览",
         },
         ["ZHT"] = new()
         {
@@ -93,6 +101,8 @@ public static class Strings
             ["card_packs_header"] = "卡牌外觀",
             ["save_changes"] = "儲存",
             ["discard_changes"] = "捨棄",
+            ["preview_unavailable"] = "無預覽",
+            ["preview_toggle_tooltip"] = "切換皮膚預覽",
         },
         ["DEU"] = new()
         {
@@ -106,6 +116,8 @@ public static class Strings
             ["card_packs_header"] = "Karten-Skins",
             ["save_changes"] = "Speichern",
             ["discard_changes"] = "Verwerfen",
+            ["preview_unavailable"] = "keine Vorschau",
+            ["preview_toggle_tooltip"] = "Skin-Vorschau umschalten",
         },
         ["FRA"] = new()
         {
@@ -119,6 +131,8 @@ public static class Strings
             ["card_packs_header"] = "Skins de cartes",
             ["save_changes"] = "Enregistrer",
             ["discard_changes"] = "Annuler",
+            ["preview_unavailable"] = "pas d'aperçu",
+            ["preview_toggle_tooltip"] = "Basculer l'aperçu du skin",
         },
         ["SPA"] = new()
         {
@@ -132,6 +146,8 @@ public static class Strings
             ["card_packs_header"] = "Diseños de cartas",
             ["save_changes"] = "Guardar",
             ["discard_changes"] = "Descartar",
+            ["preview_unavailable"] = "sin vista previa",
+            ["preview_toggle_tooltip"] = "Alternar vista previa de skin",
         },
         ["ESP"] = new()
         {
@@ -145,6 +161,8 @@ public static class Strings
             ["card_packs_header"] = "Skins de cartas",
             ["save_changes"] = "Guardar",
             ["discard_changes"] = "Descartar",
+            ["preview_unavailable"] = "sin vista previa",
+            ["preview_toggle_tooltip"] = "Alternar vista previa de skin",
         },
         ["ITA"] = new()
         {
@@ -158,6 +176,8 @@ public static class Strings
             ["card_packs_header"] = "Skin delle carte",
             ["save_changes"] = "Salva",
             ["discard_changes"] = "Annulla",
+            ["preview_unavailable"] = "nessuna anteprima",
+            ["preview_toggle_tooltip"] = "Attiva/disattiva anteprima skin",
         },
         ["PTB"] = new()
         {
@@ -171,6 +191,8 @@ public static class Strings
             ["card_packs_header"] = "Skins de cartas",
             ["save_changes"] = "Salvar",
             ["discard_changes"] = "Descartar",
+            ["preview_unavailable"] = "sem pré-visualização",
+            ["preview_toggle_tooltip"] = "Alternar pré-visualização da skin",
         },
         ["POR"] = new()
         {
@@ -184,6 +206,8 @@ public static class Strings
             ["card_packs_header"] = "Skins de cartas",
             ["save_changes"] = "Guardar",
             ["discard_changes"] = "Descartar",
+            ["preview_unavailable"] = "sem pré-visualização",
+            ["preview_toggle_tooltip"] = "Alternar pré-visualização da skin",
         },
         ["POL"] = new()
         {
@@ -197,6 +221,8 @@ public static class Strings
             ["card_packs_header"] = "Skiny kart",
             ["save_changes"] = "Zapisz",
             ["discard_changes"] = "Odrzuć",
+            ["preview_unavailable"] = "brak podglądu",
+            ["preview_toggle_tooltip"] = "Przełącz podgląd skina",
         },
         ["RUS"] = new()
         {
@@ -210,6 +236,8 @@ public static class Strings
             ["card_packs_header"] = "Скины карт",
             ["save_changes"] = "Сохранить",
             ["discard_changes"] = "Отмена",
+            ["preview_unavailable"] = "нет превью",
+            ["preview_toggle_tooltip"] = "Переключить превью скина",
         },
         ["THA"] = new()
         {
@@ -223,6 +251,8 @@ public static class Strings
             ["card_packs_header"] = "สกินการ์ด",
             ["save_changes"] = "บันทึก",
             ["discard_changes"] = "ยกเลิก",
+            ["preview_unavailable"] = "ไม่มีตัวอย่าง",
+            ["preview_toggle_tooltip"] = "สลับการแสดงตัวอย่างสกิน",
         },
         ["TUR"] = new()
         {
@@ -236,6 +266,8 @@ public static class Strings
             ["card_packs_header"] = "Kart skinleri",
             ["save_changes"] = "Kaydet",
             ["discard_changes"] = "İptal",
+            ["preview_unavailable"] = "önizleme yok",
+            ["preview_toggle_tooltip"] = "Skin önizlemesini aç/kapat",
         },
     };
 }

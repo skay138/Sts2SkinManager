@@ -14,6 +14,10 @@ A Slay the Spire 2 mod that lets you manage installed **character skin mods** an
 - **In-game UI** on Character Select:
   - **Character skin dropdown** — pick which variant is active per character
   - **Card skin panel** — toggle individual packs, reorder priority (top wins for overlapping cards), drag-and-drop or ↑/↓ arrows
+- **Skin preview on hover** — see what a skin looks like *before* committing:
+  - Character skin → hover the 👁 icon beside the dropdown
+  - Card skin → hover the row's label
+  - Sources: `preview.png` next to the `.pck` if provided; otherwise auto-extracted from the `.pck` (character-select art for characters, first card art for card packs). No live spine swap involved.
 - **Batch Save / Discard** — both panels share a single Save button. Make all your changes, click Save once, restart once.
 - **Auto-restart via Steam** — confirm and the mod relaunches STS2 through Steam (~5-10s). Cancel and the change stays queued until next launch (Discard to fully revert).
 - **Multi-language UI** — follows the game's current language. 16 languages supported; unsupported fall back to English.
@@ -35,9 +39,14 @@ Changing your selection writes to `skin_choices.json` and pops a 10-second count
 Launch STS2 → Character Select.
 
 - **Top-left**: `Skin [<character>]:` dropdown. Click a character, pick a variant.
-- **Below dropdown**: `Card skins (N/M)` panel with check, order number, ↑/↓, drag handle. Toggle, reorder by arrow or drag-and-drop.
+- **Right of dropdown**: 👁 hover icon (only visible when the selected variant differs from the currently-applied one and a preview is available) → hover to see the skin's character-select art on the right side of the screen.
+- **Below dropdown**: `Card skins (N/M)` panel with check, order number, ↑/↓, drag handle. Toggle, reorder by arrow or drag-and-drop. Hover a row's label to preview the first card art from that pack.
 - Make any combination of changes → click **Save** → restart modal appears → **Restart now** or **Restart later** (changes stay queued until next launch).
 - **Discard** rolls everything back to the boot state.
+
+### Authoring a preview image (optional, for mod authors)
+
+Drop a `preview.png` (or `.jpg`, `.jpeg`, `.webp`) next to your `.pck`. Sts2SkinManager will pick it up automatically. If you don't ship one, the manager auto-extracts a sensible default from the `.pck` (the character-select PNG for character mods, the first card art for card mods).
 
 `skin_choices.json` lives at `<user_data>/SlayTheSpire2/Sts2SkinManager/`. Direct edits are detected via file watcher and trigger the same modal.
 

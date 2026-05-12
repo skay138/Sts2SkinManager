@@ -67,6 +67,8 @@ public class SkinChoicesConfig
                 cfg.CardPacks.Schema = 2;
             }
 
+            root.Remove("_preview_visible"); // legacy v0.4.0-dev key, ignored
+
             cfg.Characters = JsonSerializer.Deserialize<Dictionary<string, CharacterSkinChoice>>(root.ToJsonString(), JsonOpts) ?? new(StringComparer.OrdinalIgnoreCase);
             return cfg;
         }
