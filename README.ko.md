@@ -2,7 +2,7 @@
 
 설치된 **캐릭터 스킨 모드** 와 **카드 스킨 모드** (카드 초상화/아트) 를 캐릭터 선택 화면의 단일 패널에서 함께 관리하는 Slay the Spire 2 모드.
 
-🇺🇸 [English README](README.md)
+🇺🇸 [English README](README.md) · 📦 [Nexus Mods 페이지](https://www.nexusmods.com/slaythespire2/mods/866)
 
 ![캐릭터 선택 화면 — 스킨 드롭다운, 카드 스킨 패널, 재시작 모달](docs/screenshots/character-select.png)
 

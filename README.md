@@ -2,7 +2,7 @@
 
 A Slay the Spire 2 mod that lets you manage installed **character skin mods** and **card skin mods** (card portraits / card art) from one in-game panel on the Character Select screen.
 
-🇰🇷 [한국어 README](README.ko.md)
+🇰🇷 [한국어 README](README.ko.md) · 📦 [Nexus Mods page](https://www.nexusmods.com/slaythespire2/mods/866)
 
 ![Character Select with skin dropdown, card skin panel, and restart modal](docs/screenshots/character-select.png)
 
