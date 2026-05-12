@@ -13,7 +13,8 @@ public record DetectedSkinMod(
     string PckPath,
     SkinModKind Kind,
     IReadOnlyList<string> Characters,
-    string? PreviewPath
+    string? PreviewPath,
+    bool IsMixed = false
 );
 
 public static class SkinModScanner
@@ -99,7 +100,12 @@ public static class SkinModScanner
                         skippedCustomCharacterMods.Add($"{pckId} → [{string.Join(",", chars)}]");
                         continue;
                     }
-                    result.Add(new DetectedSkinMod(pckId, modDir, pck, SkinModKind.Character, baseHits.ToList(), previewPath));
+                    // A mod that ships BOTH a base-character spine AND card_art/card_portraits is a "mixed"
+                    // mod (e.g. AncientWaifus). It registers as a Character variant (selectable from the
+                    // dropdown as main spine) but is also flagged IsMixed so the mixed-addon panel can
+                    // toggle it independently as a non-main mount.
+                    var isMixed = isCardMod;
+                    result.Add(new DetectedSkinMod(pckId, modDir, pck, SkinModKind.Character, baseHits.ToList(), previewPath, isMixed));
                 }
                 else if (isCardMod)
                 {

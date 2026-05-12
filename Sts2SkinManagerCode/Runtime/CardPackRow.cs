@@ -4,9 +4,12 @@ using Godot;
 
 namespace Sts2SkinManager.Runtime;
 
+public enum SkinRowCategory { CardPack, MixedAddon }
+
 public partial class CardPackRow : HBoxContainer
 {
     public string ModId { get; set; } = "";
+    public SkinRowCategory Category { get; set; } = SkinRowCategory.CardPack;
 
     private static readonly Color IndicatorColor = new(0.35f, 0.85f, 1.0f, 0.95f);
     private static readonly HashSet<CardPackRow> _allRows = new();
@@ -51,13 +54,15 @@ public partial class CardPackRow : HBoxContainer
         }
     }
 
+    private string DragType => Category == SkinRowCategory.MixedAddon ? "mixed_addon_row" : "card_pack_row";
+
     public override Variant _GetDragData(Vector2 atPosition)
     {
         try
         {
             var dict = new Godot.Collections.Dictionary
             {
-                { "type", "card_pack_row" },
+                { "type", DragType },
                 { "modId", ModId },
             };
             var preview = new Label
@@ -82,7 +87,8 @@ public partial class CardPackRow : HBoxContainer
         {
             if (data.VariantType != Variant.Type.Dictionary) { ClearAllIndicators(); return false; }
             var dict = data.AsGodotDictionary();
-            if (!dict.TryGetValue("type", out var t) || t.AsString() != "card_pack_row")
+            // Reject cross-category drops — drag is scoped per panel.
+            if (!dict.TryGetValue("type", out var t) || t.AsString() != DragType)
             {
                 ClearAllIndicators();
                 return false;
@@ -104,7 +110,14 @@ public partial class CardPackRow : HBoxContainer
             var src = srcVar.AsString();
             if (string.IsNullOrEmpty(src) || src == ModId) return;
             var above = atPosition.Y < Size.Y * 0.5f;
-            SkinSelectorOverlay.HandleDragDropReorder(src, ModId, above);
+            if (Category == SkinRowCategory.MixedAddon)
+            {
+                SkinSelectorOverlay.HandleMixedAddonDragDropReorder(src, ModId, above);
+            }
+            else
+            {
+                SkinSelectorOverlay.HandleDragDropReorder(src, ModId, above);
+            }
         }
         catch (Exception ex)
         {

@@ -104,9 +104,34 @@ public partial class MainFile : Node
             choices.SyncAvailableVariants(character, variants.Select(v => v.ModId));
         }
         choices.SyncCardPacks(cardMods.Select(c => c.ModId));
+
+        // Mixed mods (character spine + card art bundled). Tracked separately from CardPacks so the
+        // user can toggle them on top of the dropdown's main-spine choice with explicit priority.
+        var mixedMods = characterMods.Where(m => m.IsMixed).ToList();
+        choices.SyncMixedAddons(mixedMods.Select(m => m.ModId));
+
         choices.Save(choicesPath);
         Logger.Info($"skin_choices.json → {choicesPath}");
         Logger.Info($"card pack state: ordering=[{string.Join(", ", choices.CardPacks.Ordering)}], enabled={{ {string.Join(", ", choices.CardPacks.Enabled.Select(kv => $"{kv.Key}={kv.Value}"))} }}");
+        if (mixedMods.Count > 0)
+        {
+            Logger.Info($"mixed addon state: ordering=[{string.Join(", ", choices.MixedAddons.Ordering)}], enabled={{ {string.Join(", ", choices.MixedAddons.Enabled.Select(kv => $"{kv.Key}={kv.Value}"))} }}");
+        }
+
+        // Mount order matters: ordering[0] is highest priority = mounted LAST = wins on overlapping
+        // paths. (1) Mixed addons first (in reverse-ordering), then (2) the dropdown's main-spine
+        // choice last — so the dropdown choice always overrides spine conflicts coming from mixed
+        // mods, while non-conflicting paths from mixed mods (card art, events) stay applied.
+        if (mixedMods.Count > 0)
+        {
+            var mixedById = mixedMods.ToDictionary(m => m.ModId, m => m, StringComparer.OrdinalIgnoreCase);
+            foreach (var modId in choices.MixedAddons.Ordering.AsEnumerable().Reverse())
+            {
+                if (!choices.MixedAddons.Enabled.TryGetValue(modId, out var enabled) || !enabled) continue;
+                if (!mixedById.TryGetValue(modId, out var mod)) continue;
+                RuntimeMountService.MountVariantPck(mod.PckPath);
+            }
+        }
 
         foreach (var (character, variants) in byCharacter)
         {
@@ -136,7 +161,7 @@ public partial class MainFile : Node
         _watcher = new ChoicesFileWatcher(choicesPath, managerDataDir, byCharacter, cardMods, choices);
         _watcher.Start();
 
-        SkinSelectorOverlay.Configure(choicesPath, byCharacter, cardMods);
+        SkinSelectorOverlay.Configure(choicesPath, byCharacter, cardMods, mixedMods);
         SkinSelectorOverlay.SetWatcher(_watcher);
     }
 

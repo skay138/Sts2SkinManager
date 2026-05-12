@@ -50,6 +50,11 @@ public static class Strings
             ["alias_dup_modid"] = "Name conflicts with an existing mod ID",
             ["alias_dup_alias"] = "Another mod already uses this name",
             ["alias_same_as_own"] = "Same as the mod ID — leave blank to use it",
+            ["mixed_panel_header"] = "Mixed mods (spine + extras)",
+            ["mixed_panel_tooltip"] = "Toggle mixed mods (spine + extras).",
+            ["mixed_indicator_tooltip"] = "📦 Mixed mod — applies spine + card art / events together.",
+            ["mixed_panel_help"] = "Character pick from the dropdown loads first.",
+            ["skin_manager_section_header"] = "Skin manager",
         },
         ["KOR"] = new()
         {
@@ -72,6 +77,11 @@ public static class Strings
             ["alias_dup_modid"] = "다른 mod ID 와 겹쳐요",
             ["alias_dup_alias"] = "다른 mod 가 이미 쓰는 이름이에요",
             ["alias_same_as_own"] = "mod ID 와 같아요 — 비우면 그대로 사용",
+            ["mixed_panel_header"] = "혼합 mod (스파인 + 추가요소)",
+            ["mixed_panel_tooltip"] = "혼합 mod 켜고 끄기 (스파인 + 추가요소)",
+            ["mixed_indicator_tooltip"] = "📦 혼합 mod — 스파인과 카드 아트 / 이벤트를 함께 적용",
+            ["mixed_panel_help"] = "캐릭터 선택 모드가 먼저 로드됩니다.",
+            ["skin_manager_section_header"] = "스킨 매니저",
         },
         ["JPN"] = new()
         {
@@ -87,6 +97,11 @@ public static class Strings
             ["discard_changes"] = "破棄",
             ["preview_unavailable"] = "プレビューなし",
             ["preview_toggle_tooltip"] = "スキンプレビュー切替",
+            ["mixed_panel_header"] = "混合 mod (スパイン + 追加要素)",
+            ["mixed_panel_tooltip"] = "混合 mod のオン・オフ (スパイン + 追加要素)",
+            ["mixed_indicator_tooltip"] = "📦 混合 mod — スパインとカードアート / イベントを一緒に適用",
+            ["mixed_panel_help"] = "上のキャラクター選択が先に読み込まれます。",
+            ["skin_manager_section_header"] = "スキンマネージャー",
         },
         ["ZHS"] = new()
         {
@@ -102,6 +117,11 @@ public static class Strings
             ["discard_changes"] = "丢弃",
             ["preview_unavailable"] = "无预览",
             ["preview_toggle_tooltip"] = "切换皮肤预览",
+            ["mixed_panel_header"] = "混合 mod (骨骼 + 附加)",
+            ["mixed_panel_tooltip"] = "切换混合 mod (骨骼 + 附加)",
+            ["mixed_indicator_tooltip"] = "📦 混合 mod — 同时应用骨骼与卡牌图 / 事件",
+            ["mixed_panel_help"] = "上方角色选择优先加载。",
+            ["skin_manager_section_header"] = "皮肤管理器",
         },
         ["ZHT"] = new()
         {
@@ -117,6 +137,11 @@ public static class Strings
             ["discard_changes"] = "捨棄",
             ["preview_unavailable"] = "無預覽",
             ["preview_toggle_tooltip"] = "切換皮膚預覽",
+            ["mixed_panel_header"] = "混合 mod (骨架 + 附加)",
+            ["mixed_panel_tooltip"] = "切換混合 mod (骨架 + 附加)",
+            ["mixed_indicator_tooltip"] = "📦 混合 mod — 同時套用骨架與卡牌圖 / 事件",
+            ["mixed_panel_help"] = "上方角色選擇優先載入。",
+            ["skin_manager_section_header"] = "皮膚管理器",
         },
         ["DEU"] = new()
         {
@@ -132,6 +157,11 @@ public static class Strings
             ["discard_changes"] = "Verwerfen",
             ["preview_unavailable"] = "keine Vorschau",
             ["preview_toggle_tooltip"] = "Skin-Vorschau umschalten",
+            ["mixed_panel_header"] = "Gemischte Mods (Spine + Extras)",
+            ["mixed_panel_tooltip"] = "Gemischte Mods umschalten (Spine + Extras)",
+            ["mixed_indicator_tooltip"] = "📦 Gemischter Mod — wendet Spine + Kartenkunst / Events zusammen an",
+            ["mixed_panel_help"] = "Charakterauswahl oben wird zuerst geladen.",
+            ["skin_manager_section_header"] = "Skin-Manager",
         },
         ["FRA"] = new()
         {
@@ -147,6 +177,11 @@ public static class Strings
             ["discard_changes"] = "Annuler",
             ["preview_unavailable"] = "pas d'aperçu",
             ["preview_toggle_tooltip"] = "Basculer l'aperçu du skin",
+            ["mixed_panel_header"] = "Mods mixtes (squelette + extras)",
+            ["mixed_panel_tooltip"] = "Activer/désactiver les mods mixtes (squelette + extras)",
+            ["mixed_indicator_tooltip"] = "📦 Mod mixte — applique squelette + cartes / événements ensemble",
+            ["mixed_panel_help"] = "La sélection de personnage en haut est chargée en premier.",
+            ["skin_manager_section_header"] = "Gestionnaire de skins",
         },
         ["SPA"] = new()
         {
@@ -162,6 +197,11 @@ public static class Strings
             ["discard_changes"] = "Descartar",
             ["preview_unavailable"] = "sin vista previa",
             ["preview_toggle_tooltip"] = "Alternar vista previa de skin",
+            ["mixed_panel_header"] = "Mods mixtos (esqueleto + extras)",
+            ["mixed_panel_tooltip"] = "Alternar mods mixtos (esqueleto + extras)",
+            ["mixed_indicator_tooltip"] = "📦 Mod mixto — aplica esqueleto + cartas / eventos juntos",
+            ["mixed_panel_help"] = "La selección de personaje de arriba se carga primero.",
+            ["skin_manager_section_header"] = "Gestor de skins",
         },
         ["ESP"] = new()
         {
@@ -177,6 +217,11 @@ public static class Strings
             ["discard_changes"] = "Descartar",
             ["preview_unavailable"] = "sin vista previa",
             ["preview_toggle_tooltip"] = "Alternar vista previa de skin",
+            ["mixed_panel_header"] = "Mods mixtos (esqueleto + extras)",
+            ["mixed_panel_tooltip"] = "Alternar mods mixtos (esqueleto + extras)",
+            ["mixed_indicator_tooltip"] = "📦 Mod mixto — aplica esqueleto + cartas / eventos juntos",
+            ["mixed_panel_help"] = "La selección de personaje de arriba se carga primero.",
+            ["skin_manager_section_header"] = "Gestor de skins",
         },
         ["ITA"] = new()
         {
@@ -192,6 +237,11 @@ public static class Strings
             ["discard_changes"] = "Annulla",
             ["preview_unavailable"] = "nessuna anteprima",
             ["preview_toggle_tooltip"] = "Attiva/disattiva anteprima skin",
+            ["mixed_panel_header"] = "Mod misti (spine + extra)",
+            ["mixed_panel_tooltip"] = "Attiva/disattiva mod misti (spine + extra)",
+            ["mixed_indicator_tooltip"] = "📦 Mod misto — applica spine + carte / eventi insieme",
+            ["mixed_panel_help"] = "La scelta del personaggio sopra viene caricata per prima.",
+            ["skin_manager_section_header"] = "Gestore skin",
         },
         ["PTB"] = new()
         {
@@ -207,6 +257,11 @@ public static class Strings
             ["discard_changes"] = "Descartar",
             ["preview_unavailable"] = "sem pré-visualização",
             ["preview_toggle_tooltip"] = "Alternar pré-visualização da skin",
+            ["mixed_panel_header"] = "Mods mistos (spine + extras)",
+            ["mixed_panel_tooltip"] = "Alternar mods mistos (spine + extras)",
+            ["mixed_indicator_tooltip"] = "📦 Mod misto — aplica spine + arte de cartas / eventos juntos",
+            ["mixed_panel_help"] = "A escolha de personagem acima carrega primeiro.",
+            ["skin_manager_section_header"] = "Gerenciador de skins",
         },
         ["POR"] = new()
         {
@@ -222,6 +277,11 @@ public static class Strings
             ["discard_changes"] = "Descartar",
             ["preview_unavailable"] = "sem pré-visualização",
             ["preview_toggle_tooltip"] = "Alternar pré-visualização da skin",
+            ["mixed_panel_header"] = "Mods mistos (spine + extras)",
+            ["mixed_panel_tooltip"] = "Alternar mods mistos (spine + extras)",
+            ["mixed_indicator_tooltip"] = "📦 Mod misto — aplica spine + arte de cartas / eventos juntos",
+            ["mixed_panel_help"] = "A escolha de personagem acima é carregada primeiro.",
+            ["skin_manager_section_header"] = "Gestor de skins",
         },
         ["POL"] = new()
         {
@@ -237,6 +297,11 @@ public static class Strings
             ["discard_changes"] = "Odrzuć",
             ["preview_unavailable"] = "brak podglądu",
             ["preview_toggle_tooltip"] = "Przełącz podgląd skina",
+            ["mixed_panel_header"] = "Mody mieszane (szkielet + dodatki)",
+            ["mixed_panel_tooltip"] = "Przełącz mody mieszane (szkielet + dodatki)",
+            ["mixed_indicator_tooltip"] = "📦 Mod mieszany — stosuje szkielet + grafiki kart / wydarzeń razem",
+            ["mixed_panel_help"] = "Wybór postaci powyżej ładuje się najpierw.",
+            ["skin_manager_section_header"] = "Menedżer skinów",
         },
         ["RUS"] = new()
         {
@@ -252,6 +317,11 @@ public static class Strings
             ["discard_changes"] = "Отмена",
             ["preview_unavailable"] = "нет превью",
             ["preview_toggle_tooltip"] = "Переключить превью скина",
+            ["mixed_panel_header"] = "Смешанные моды (спайн + дополнения)",
+            ["mixed_panel_tooltip"] = "Переключить смешанные моды (спайн + дополнения)",
+            ["mixed_indicator_tooltip"] = "📦 Смешанный мод — применяет спайн + арт карт / события вместе",
+            ["mixed_panel_help"] = "Выбор персонажа сверху загружается первым.",
+            ["skin_manager_section_header"] = "Менеджер скинов",
         },
         ["THA"] = new()
         {
@@ -267,6 +337,11 @@ public static class Strings
             ["discard_changes"] = "ยกเลิก",
             ["preview_unavailable"] = "ไม่มีตัวอย่าง",
             ["preview_toggle_tooltip"] = "สลับการแสดงตัวอย่างสกิน",
+            ["mixed_panel_header"] = "ม็อดผสม (สไปน์ + ส่วนเสริม)",
+            ["mixed_panel_tooltip"] = "สลับม็อดผสม (สไปน์ + ส่วนเสริม)",
+            ["mixed_indicator_tooltip"] = "📦 ม็อดผสม — ใช้สไปน์ + อาร์ตการ์ด / อีเวนต์ร่วมกัน",
+            ["mixed_panel_help"] = "ตัวเลือกตัวละครด้านบนถูกโหลดก่อน",
+            ["skin_manager_section_header"] = "ตัวจัดการสกิน",
         },
         ["TUR"] = new()
         {
@@ -282,6 +357,11 @@ public static class Strings
             ["discard_changes"] = "İptal",
             ["preview_unavailable"] = "önizleme yok",
             ["preview_toggle_tooltip"] = "Skin önizlemesini aç/kapat",
+            ["mixed_panel_header"] = "Karışık modlar (spine + ek)",
+            ["mixed_panel_tooltip"] = "Karışık modları aç/kapat (spine + ek)",
+            ["mixed_indicator_tooltip"] = "📦 Karışık mod — spine + kart sanatını / olayları birlikte uygular",
+            ["mixed_panel_help"] = "Yukarıdaki karakter seçimi önce yüklenir.",
+            ["skin_manager_section_header"] = "Skin yöneticisi",
         },
     };
 }

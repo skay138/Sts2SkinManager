@@ -35,6 +35,12 @@ public class SkinChoicesConfig
 
     public CardPacksConfig CardPacks { get; set; } = new();
 
+    // Mixed mods (character spine + card art bundled in one .pck, e.g. AncientWaifus). They can be
+    // toggled independently of the main-spine dropdown selection. Same schema as CardPacksConfig:
+    // ordering[0] = highest priority (mounted last, wins overlapping paths). Mixed mods are still
+    // overridden by whichever Character variant the dropdown ultimately mounts.
+    public CardPacksConfig MixedAddons { get; set; } = new();
+
     // modId → user-chosen alias. modId stays the unique key; alias is display-only.
     // Stale entries (mods no longer detected) get pruned in SyncAliases.
     public Dictionary<string, string> Aliases { get; set; } = new(StringComparer.OrdinalIgnoreCase);
@@ -71,6 +77,13 @@ public class SkinChoicesConfig
                 cfg.CardPacks.Schema = 2;
             }
 
+            if (root.TryGetPropertyValue("_mixed_addons", out var mixedNode) && mixedNode != null)
+            {
+                cfg.MixedAddons = JsonSerializer.Deserialize<CardPacksConfig>(mixedNode.ToJsonString(), JsonOpts) ?? new CardPacksConfig();
+                cfg.MixedAddons.Schema = 2; // Mixed addons are introduced post-migration; always treat ordering as top-wins.
+                root.Remove("_mixed_addons");
+            }
+
             if (root.TryGetPropertyValue("_aliases", out var aliasesNode) && aliasesNode != null)
             {
                 var deserialized = JsonSerializer.Deserialize<Dictionary<string, string>>(aliasesNode.ToJsonString(), JsonOpts);
@@ -103,6 +116,12 @@ public class SkinChoicesConfig
         var cardPacksNode = JsonNode.Parse(JsonSerializer.Serialize(CardPacks, JsonOpts));
         if (cardPacksNode != null) root["_card_packs"] = cardPacksNode;
 
+        if (MixedAddons.Ordering.Count > 0 || MixedAddons.Enabled.Count > 0)
+        {
+            var mixedNode = JsonNode.Parse(JsonSerializer.Serialize(MixedAddons, JsonOpts));
+            if (mixedNode != null) root["_mixed_addons"] = mixedNode;
+        }
+
         if (Aliases.Count > 0)
         {
             var aliasNode = JsonNode.Parse(JsonSerializer.Serialize(Aliases, JsonOpts));
@@ -110,6 +129,33 @@ public class SkinChoicesConfig
         }
 
         File.WriteAllText(path, root.ToJsonString(JsonOpts));
+    }
+
+    // Same algorithm as SyncCardPacks but operates on MixedAddons.
+    public void SyncMixedAddons(IEnumerable<string> detectedModIds)
+    {
+        var detected = detectedModIds.ToList();
+        var detectedSet = new HashSet<string>(detected, StringComparer.OrdinalIgnoreCase);
+
+        var newOrdering = new List<string>();
+        foreach (var modId in MixedAddons.Ordering)
+        {
+            if (detectedSet.Contains(modId) && !newOrdering.Contains(modId, StringComparer.OrdinalIgnoreCase))
+                newOrdering.Add(modId);
+        }
+        foreach (var modId in detected.OrderBy(m => m, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!newOrdering.Contains(modId, StringComparer.OrdinalIgnoreCase)) newOrdering.Add(modId);
+        }
+        MixedAddons.Ordering = newOrdering;
+
+        // Default mixed addons OFF — they're additive on top of the dropdown choice, so the user opts in.
+        foreach (var modId in detected)
+        {
+            if (!MixedAddons.Enabled.ContainsKey(modId)) MixedAddons.Enabled[modId] = false;
+        }
+        var stale = MixedAddons.Enabled.Keys.Where(k => !detectedSet.Contains(k)).ToList();
+        foreach (var s in stale) MixedAddons.Enabled.Remove(s);
     }
 
     // Drops alias entries whose modId is no longer present in the detected set.

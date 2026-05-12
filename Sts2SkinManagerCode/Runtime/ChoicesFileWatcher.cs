@@ -18,6 +18,7 @@ public sealed class ChoicesFileWatcher : IDisposable
 
     private readonly Dictionary<string, string> _appliedActive = new(StringComparer.OrdinalIgnoreCase);
     private CardPacksConfig _appliedCardPacks;
+    private CardPacksConfig _appliedMixedAddons;
 
     public ChoicesFileWatcher(
         string choicesPath,
@@ -32,6 +33,7 @@ public sealed class ChoicesFileWatcher : IDisposable
         _cardMods = cardMods;
         foreach (var (c, choice) in initial.Characters) _appliedActive[c] = choice.Active;
         _appliedCardPacks = Clone(initial.CardPacks);
+        _appliedMixedAddons = Clone(initial.MixedAddons);
     }
 
     public void Start()
@@ -113,12 +115,26 @@ public sealed class ChoicesFileWatcher : IDisposable
             }
         }
 
+        var mixedChanged = !CardPacksEqual(fresh.MixedAddons, _appliedMixedAddons);
+        if (mixedChanged)
+        {
+            anyChange = true;
+            MainFile.Logger.Info("mixed addons changed:");
+            foreach (var kv in fresh.MixedAddons.Enabled)
+            {
+                var was = _appliedMixedAddons.Enabled.TryGetValue(kv.Key, out var w) ? w : false;
+                if (was != kv.Value) MainFile.Logger.Info($"  {kv.Key}: enabled {was} → {kv.Value}");
+            }
+            _appliedMixedAddons = Clone(fresh.MixedAddons);
+        }
+
         if (anyChange)
         {
             MainFile.Logger.Info($"showing 10s restart countdown modal");
             RestartCountdownModal.ShowOrReset(_managerDataDir, 10, () => { /* unified Save pattern: no revert */ });
             SkinSelectorOverlay.RefreshDropdown();
             SkinSelectorOverlay.RefreshCardPacks();
+            SkinSelectorOverlay.RefreshMixedAddons();
         }
     }
 
@@ -133,6 +149,7 @@ public sealed class ChoicesFileWatcher : IDisposable
             _appliedActive.Clear();
             foreach (var kv in fresh.Characters) _appliedActive[kv.Key] = kv.Value.Active ?? "default";
             _appliedCardPacks = Clone(fresh.CardPacks);
+            _appliedMixedAddons = Clone(fresh.MixedAddons);
             _lastFireUtc = DateTime.UtcNow.AddMilliseconds(500);
         }
         catch (Exception ex) { MainFile.Logger.Warn($"NoteSavedAsApplied error: {ex.Message}"); }

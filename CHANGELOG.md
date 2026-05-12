@@ -4,6 +4,19 @@ All notable changes to Sts2SkinManager are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-05-13
+
+### Added
+- **Mixed-mod awareness.** Mods that bundle a character spine with card art / event scenes (e.g. AncientWaifus) are now detected as mixed. They appear in the character dropdown with a `📦` indicator (selecting one applies spine + extras together) AND in a new "Mixed mods" panel, where you can toggle them independently to layer their extras on top of a different main-spine pick (the dropdown's character pick always wins spine conflicts).
+- **Boot mount priority.** Mixed addons are mounted first (in reverse-priority order); the dropdown's main-spine choice is mounted last so it overrides any conflicting paths.
+- **Collapsible Skin Manager section.** The whole UI is now wrapped in a single toggle header (`▶ 스킨 매니저`) — collapsed by default to keep Character Select clean. Save / Discard stay visible alongside the toggle no matter what state the body is in.
+- **Tabbed inner layout.** Card-skin and mixed-mod sections live as tabs inside one panel — only one row list shows at a time, with a generous content area when expanded.
+- 16-language coverage for every new key (mixed panel + skin manager header).
+
+### Changed
+- Dropdown item text for mixed mods is prefixed with `📦` and ships an explicit per-item tooltip (`SetItemTooltip`) so popup hover surfaces the explanation reliably.
+- Inline help label inside the Mixed mod tab so the explanation is always visible without depending on hover tooltips.
+
 ## [0.5.0] - 2026-05-12
 
 ### Added

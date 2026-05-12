@@ -15,6 +15,7 @@ public static class SkinSelectorOverlay
     private static string _choicesPath = "";
     private static Dictionary<string, List<DetectedSkinMod>>? _byCharacter;
     private static List<DetectedSkinMod> _cardMods = new();
+    private static List<DetectedSkinMod> _mixedMods = new();
 
     private static OptionButton? _opt;
     private static Label? _label;
@@ -33,22 +34,35 @@ public static class SkinSelectorOverlay
     private static string? _hoveredCardModId;
     private static readonly Dictionary<string, ImageTexture?> _previewCache = new(StringComparer.OrdinalIgnoreCase);
     private static readonly Dictionary<string, ImageTexture?> _cardPreviewCache = new(StringComparer.OrdinalIgnoreCase);
-    private static VBoxContainer? _cardPackVBox;
-    private static Button? _cardPackHeaderBtn;
+    // Outer collapsible wrapper: a single toggle header reveals/hides the whole skin manager UI
+    // (Save/Discard + Tabs). Default = collapsed so the character select screen stays clean.
+    // Tab-style inner: a TabContainer toggles between the card-skin and mixed-addon sections so
+    // only one set of rows is visible at a time.
+    private static VBoxContainer? _accordionVBox;
+    private static Button? _outerToggleBtn;
+    private static VBoxContainer? _outerBody;
+    private static bool _outerExpanded = false;
+    private static TabContainer? _tabContainer;
     private static Button? _cardPackSaveBtn;
     private static Button? _cardPackDiscardBtn;
+    private static int _cardPackTabIndex = -1;
+    private static int _mixedTabIndex = -1;
     private static ScrollContainer? _cardPackScroll;
     private static VBoxContainer? _cardPackRows;
-    private static bool _cardPackExpanded = true;
 
-    // Pending (in-memory) state shared by character dropdown + card pack panel.
+    private static ScrollContainer? _mixedScroll;
+    private static VBoxContainer? _mixedRows;
+
+    // Pending (in-memory) state shared by character dropdown + card pack panel + mixed-addon panel.
     // Mutations here don't touch disk; OnSave commits to choices.json and triggers the modal.
     private static CardPacksConfig? _pendingCardPacks;
+    private static CardPacksConfig? _pendingMixedAddons;
     private static readonly Dictionary<string, string> _pendingActiveByCharacter = new(StringComparer.OrdinalIgnoreCase);
 
     // Boot snapshot — what the game actually has loaded right now. dirty = (effective state != boot snapshot).
     // Stays dirty until the user restarts (which re-captures the snapshot). OnDiscard restores everything to this.
     private static CardPacksConfig? _bootSnapshotCardPacks;
+    private static CardPacksConfig? _bootSnapshotMixedAddons;
     private static readonly Dictionary<string, string> _bootSnapshotActive = new(StringComparer.OrdinalIgnoreCase);
 
     // Set by MainFile after the watcher is constructed; OnDiscard calls NoteSavedAsApplied()
@@ -62,15 +76,18 @@ public static class SkinSelectorOverlay
     private static bool _localeChangeSubscribed;
     private static bool _alreadyHandledThisEvent;
 
-    public static void Configure(string choicesPath, Dictionary<string, List<DetectedSkinMod>> byCharacter, List<DetectedSkinMod> cardMods)
+    public static void Configure(string choicesPath, Dictionary<string, List<DetectedSkinMod>> byCharacter, List<DetectedSkinMod> cardMods, List<DetectedSkinMod> mixedMods)
     {
         _choicesPath = choicesPath;
         _byCharacter = byCharacter;
         _cardMods = cardMods;
+        _mixedMods = mixedMods;
 
         var initial = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
         _pendingCardPacks = ClonePacks(initial.CardPacks);
+        _pendingMixedAddons = ClonePacks(initial.MixedAddons);
         _bootSnapshotCardPacks = ClonePacks(initial.CardPacks);
+        _bootSnapshotMixedAddons = ClonePacks(initial.MixedAddons);
         _bootSnapshotActive.Clear();
         foreach (var kv in initial.Characters) _bootSnapshotActive[kv.Key] = kv.Value.Active ?? "default";
         _pendingActiveByCharacter.Clear();
@@ -179,7 +196,7 @@ public static class SkinSelectorOverlay
             ApplyPreviewVisibility();
             RefreshItems();
 
-            if (_cardMods.Count > 0) BuildCardPackPanel(screen);
+            if (_cardMods.Count > 0 || _mixedMods.Count > 0) BuildAccordionPanel(screen);
 
             EnsureLocaleSubscribed();
         }
@@ -488,100 +505,162 @@ public static class SkinSelectorOverlay
         }
     }
 
-    private static void BuildCardPackPanel(Node screen)
+    // Single panel that hosts both card-skin and mixed-addon sections as tabs. Save/Discard live
+    // above the TabContainer so they stay reachable regardless of the active tab. Only one tab's
+    // rows are visible at a time — the user clicks the tab header to switch.
+    private static void BuildAccordionPanel(Node screen)
     {
         var vbox = new VBoxContainer
         {
             Position = new Vector2(40, 110),
             CustomMinimumSize = new Vector2(480, 40),
         };
-        _cardPackVBox = vbox;
+        _accordionVBox = vbox;
 
-        var headerHbox = new HBoxContainer
-        {
-            CustomMinimumSize = new Vector2(480, 32),
-        };
+        // Top row — toggle (compact) + Save / Discard always visible alongside.
+        var topRow = new HBoxContainer { CustomMinimumSize = new Vector2(480, 36) };
 
-        var headerBtn = new Button
+        var outerToggle = new Button
         {
-            CustomMinimumSize = new Vector2(280, 32),
+            CustomMinimumSize = new Vector2(220, 36),
             Alignment = HorizontalAlignment.Left,
         };
-        _cardPackHeaderBtn = headerBtn;
-        headerBtn.Pressed += ToggleCardPackExpanded;
-        headerHbox.AddChild(headerBtn);
+        _outerToggleBtn = outerToggle;
+        outerToggle.Pressed += ToggleOuterExpanded;
+        topRow.AddChild(outerToggle);
 
-        var saveBtn = new Button
-        {
-            Text = Strings.Get("save_changes"),
-            CustomMinimumSize = new Vector2(90, 32),
-        };
+        var saveBtn = new Button { Text = Strings.Get("save_changes"), CustomMinimumSize = new Vector2(120, 36) };
         _cardPackSaveBtn = saveBtn;
         saveBtn.Pressed += OnSave;
-        headerHbox.AddChild(saveBtn);
+        topRow.AddChild(saveBtn);
 
-        var discardBtn = new Button
-        {
-            Text = Strings.Get("discard_changes"),
-            CustomMinimumSize = new Vector2(90, 32),
-        };
+        var discardBtn = new Button { Text = Strings.Get("discard_changes"), CustomMinimumSize = new Vector2(120, 36) };
         _cardPackDiscardBtn = discardBtn;
         discardBtn.Pressed += OnDiscard;
-        headerHbox.AddChild(discardBtn);
+        topRow.AddChild(discardBtn);
 
-        vbox.AddChild(headerHbox);
+        vbox.AddChild(topRow);
 
-        var scroll = new ScrollContainer
+        // Body wraps just the tabs — collapsed by default so the screen stays clean.
+        var body = new VBoxContainer { CustomMinimumSize = new Vector2(480, 0) };
+        _outerBody = body;
+        vbox.AddChild(body);
+
+        // Tabs — taller now since the outer toggle gives us screen budget when expanded.
+        var tabs = new TabContainer { CustomMinimumSize = new Vector2(480, 400) };
+        _tabContainer = tabs;
+        body.AddChild(tabs);
+
+        _cardPackTabIndex = -1;
+        _mixedTabIndex = -1;
+
+        if (_cardMods.Count > 0)
         {
-            CustomMinimumSize = new Vector2(480, 200),
-            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
-            VerticalScrollMode = ScrollContainer.ScrollMode.Auto,
-        };
-        _cardPackScroll = scroll;
-        vbox.AddChild(scroll);
+            var cardTab = new VBoxContainer { Name = "CardSkinTab" };
+            var cardScroll = new ScrollContainer
+            {
+                CustomMinimumSize = new Vector2(460, 360),
+                HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+                VerticalScrollMode = ScrollContainer.ScrollMode.Auto,
+            };
+            _cardPackScroll = cardScroll;
+            cardTab.AddChild(cardScroll);
 
-        var rows = new VBoxContainer
+            var cardRows = new VBoxContainer { CustomMinimumSize = new Vector2(460, 0) };
+            _cardPackRows = cardRows;
+            cardScroll.AddChild(cardRows);
+
+            tabs.AddChild(cardTab);
+            _cardPackTabIndex = cardTab.GetIndex();
+            BuildCardPackRows();
+        }
+
+        if (_mixedMods.Count > 0)
         {
-            CustomMinimumSize = new Vector2(460, 0),
-        };
-        _cardPackRows = rows;
-        scroll.AddChild(rows);
+            var mixedTab = new VBoxContainer { Name = "MixedAddonTab" };
 
-        BuildCardPackRows();
+            var helpLabel = new Label
+            {
+                Text = Strings.Get("mixed_panel_help"),
+                CustomMinimumSize = new Vector2(460, 0),
+                AutowrapMode = TextServer.AutowrapMode.WordSmart,
+                Modulate = new Color(0.75f, 0.75f, 0.75f),
+            };
+            mixedTab.AddChild(helpLabel);
+
+            var mixedScroll = new ScrollContainer
+            {
+                CustomMinimumSize = new Vector2(460, 340),
+                HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+                VerticalScrollMode = ScrollContainer.ScrollMode.Auto,
+            };
+            _mixedScroll = mixedScroll;
+            mixedTab.AddChild(mixedScroll);
+
+            var mixedRows = new VBoxContainer { CustomMinimumSize = new Vector2(460, 0) };
+            _mixedRows = mixedRows;
+            mixedScroll.AddChild(mixedRows);
+
+            tabs.AddChild(mixedTab);
+            _mixedTabIndex = mixedTab.GetIndex();
+            BuildMixedAddonRows();
+        }
+
         UpdateCardPackHeader();
-        ApplyCardPackExpanded();
+        UpdateMixedHeader();
+        ApplyOuterExpanded();
+        UpdateOuterToggleText();
 
         vbox.ZIndex = 1000;
         screen.AddChild(vbox);
-        MainFile.Logger.Info($"card pack panel attached ({_cardMods.Count} packs)");
+        MainFile.Logger.Info($"tab panel attached (card={_cardMods.Count}, mixed={_mixedMods.Count})");
     }
+
+    private static void ToggleOuterExpanded()
+    {
+        _outerExpanded = !_outerExpanded;
+        ApplyOuterExpanded();
+        UpdateOuterToggleText();
+    }
+
+    private static void ApplyOuterExpanded()
+    {
+        if (_outerBody != null && GodotObject.IsInstanceValid(_outerBody))
+            _outerBody.Visible = _outerExpanded;
+    }
+
+    private static void UpdateOuterToggleText()
+    {
+        if (_outerToggleBtn == null || !GodotObject.IsInstanceValid(_outerToggleBtn)) return;
+        var arrow = _outerExpanded ? "▼" : "▶";
+        var dirty = IsAnyDirty();
+        var dirtyMark = dirty ? " *" : "";
+        _outerToggleBtn.Text = $"{arrow}  {Strings.Get("skin_manager_section_header")}{dirtyMark}";
+    }
+
+    private static void BuildCardPackPanel(Node screen) => BuildAccordionPanel(screen);
+    private static void BuildMixedAddonPanel(Node screen) { /* folded into BuildAccordionPanel */ }
 
     private static void ToggleCardPackExpanded()
     {
-        _cardPackExpanded = !_cardPackExpanded;
-        ApplyCardPackExpanded();
-        UpdateCardPackHeader();
-        MainFile.Logger.Info($"card pack panel {(_cardPackExpanded ? "expanded" : "collapsed")}");
+        // Tab-based: just switch to the card tab if present.
+        if (_tabContainer != null && GodotObject.IsInstanceValid(_tabContainer) && _cardPackTabIndex >= 0)
+            _tabContainer.CurrentTab = _cardPackTabIndex;
     }
 
-    private static void ApplyCardPackExpanded()
-    {
-        if (_cardPackScroll != null && GodotObject.IsInstanceValid(_cardPackScroll))
-        {
-            _cardPackScroll.Visible = _cardPackExpanded;
-        }
-    }
+    private static void ApplyCardPackExpanded() { /* tabs handle visibility */ }
 
     private static void UpdateCardPackHeader()
     {
-        if (_cardPackHeaderBtn == null || !GodotObject.IsInstanceValid(_cardPackHeaderBtn)) return;
         var pending = _pendingCardPacks ?? new CardPacksConfig();
         var total = pending.Ordering.Count;
         var enabled = pending.Enabled.Count(kv => kv.Value);
-        var arrow = _cardPackExpanded ? "▼" : "▶";
         var dirty = IsAnyDirty();
         var dirtyMark = dirty ? " *" : "";
-        _cardPackHeaderBtn.Text = $"{arrow}  {Strings.Get("card_packs_header")} ({enabled}/{total}){dirtyMark}";
+        var title = $"{Strings.Get("card_packs_header")} ({enabled}/{total}){dirtyMark}";
+
+        if (_tabContainer != null && GodotObject.IsInstanceValid(_tabContainer) && _cardPackTabIndex >= 0)
+            _tabContainer.SetTabTitle(_cardPackTabIndex, title);
 
         if (_cardPackSaveBtn != null && GodotObject.IsInstanceValid(_cardPackSaveBtn))
         {
@@ -593,6 +672,7 @@ public static class SkinSelectorOverlay
             _cardPackDiscardBtn.Disabled = !dirty;
             _cardPackDiscardBtn.Text = Strings.Get("discard_changes");
         }
+        UpdateOuterToggleText();
     }
 
     private static void BuildCardPackRows()
@@ -840,6 +920,241 @@ public static class SkinSelectorOverlay
         catch (Exception ex) { MainFile.Logger.Warn($"drag-drop reorder error: {ex.Message}"); }
     }
 
+    // === Mixed-addon helpers (panel is built inside BuildAccordionPanel) ===
+
+    private static void ToggleMixedExpanded()
+    {
+        if (_tabContainer != null && GodotObject.IsInstanceValid(_tabContainer) && _mixedTabIndex >= 0)
+            _tabContainer.CurrentTab = _mixedTabIndex;
+    }
+
+    private static void ApplyMixedExpanded() { /* tabs handle visibility */ }
+
+    private static void UpdateMixedHeader()
+    {
+        var pending = _pendingMixedAddons ?? new CardPacksConfig();
+        var total = pending.Ordering.Count;
+        var enabled = pending.Enabled.Count(kv => kv.Value);
+        var title = $"{Strings.Get("mixed_panel_header")} ({enabled}/{total})";
+
+        if (_tabContainer != null && GodotObject.IsInstanceValid(_tabContainer) && _mixedTabIndex >= 0)
+        {
+            _tabContainer.SetTabTitle(_mixedTabIndex, title);
+            _tabContainer.SetTabTooltip(_mixedTabIndex, Strings.Get("mixed_panel_tooltip"));
+        }
+    }
+
+    private static void BuildMixedAddonRows()
+    {
+        if (_mixedRows == null || !GodotObject.IsInstanceValid(_mixedRows)) return;
+
+        for (var i = _mixedRows.GetChildCount() - 1; i >= 0; i--)
+        {
+            var child = _mixedRows.GetChild(i);
+            _mixedRows.RemoveChild(child);
+            child.QueueFree();
+        }
+
+        var packs = _pendingMixedAddons ?? new CardPacksConfig();
+        for (var i = 0; i < packs.Ordering.Count; i++)
+        {
+            var modId = packs.Ordering[i];
+            var row = BuildMixedAddonRow(modId, packs, i, packs.Ordering.Count);
+            _mixedRows.AddChild(row);
+        }
+        UpdateMixedHeader();
+        UpdateCardPackHeader(); // dirty mark on shared Save button
+    }
+
+    private static Control BuildMixedAddonRow(string modId, CardPacksConfig packs, int index, int total)
+    {
+        var hbox = new CardPackRow
+        {
+            ModId = modId,
+            Category = SkinRowCategory.MixedAddon,
+            MouseFilter = Control.MouseFilterEnum.Pass,
+            MouseDefaultCursorShape = Control.CursorShape.Move,
+        };
+        var enabled = packs.Enabled.TryGetValue(modId, out var e) ? e : false;
+
+        var dragHandle = new Label
+        {
+            Text = "⋮⋮",
+            CustomMinimumSize = new Vector2(20, 32),
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        hbox.AddChild(dragHandle);
+
+        var check = new CheckBox { ButtonPressed = enabled, CustomMinimumSize = new Vector2(32, 32) };
+        hbox.AddChild(check);
+
+        var status = new Label
+        {
+            CustomMinimumSize = new Vector2(28, 32),
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        hbox.AddChild(status);
+
+        var orderLabel = new Label
+        {
+            Text = $"{index + 1}.",
+            CustomMinimumSize = new Vector2(32, 32),
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Right,
+        };
+        hbox.AddChild(orderLabel);
+
+        var aliases = LoadAliases();
+        var label = new Label
+        {
+            Text = AliasService.Resolve(modId, aliases),
+            CustomMinimumSize = new Vector2(248, 32),
+            VerticalAlignment = VerticalAlignment.Center,
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            TooltipText = modId,
+        };
+        label.MouseEntered += () => OnCardRowHoverStart(modId);
+        label.MouseExited += () => OnCardRowHoverEnd(modId);
+        hbox.AddChild(label);
+
+        var aliasEdit = new LineEdit
+        {
+            CustomMinimumSize = new Vector2(192, 32),
+            PlaceholderText = Strings.Get("alias_placeholder"),
+            Visible = false,
+        };
+        hbox.AddChild(aliasEdit);
+
+        var editBtn = new Button { Text = "✏", CustomMinimumSize = new Vector2(28, 32), TooltipText = Strings.Get("alias_edit_tooltip") };
+        hbox.AddChild(editBtn);
+
+        var saveBtn = new Button { Text = "✓", CustomMinimumSize = new Vector2(28, 32), TooltipText = Strings.Get("alias_save_tooltip"), Visible = false };
+        hbox.AddChild(saveBtn);
+
+        var cancelBtn = new Button { Text = "✕", CustomMinimumSize = new Vector2(28, 32), TooltipText = Strings.Get("alias_cancel_tooltip"), Visible = false };
+        hbox.AddChild(cancelBtn);
+
+        void EnterEditMode()
+        {
+            aliasEdit.Text = LoadAliases().TryGetValue(modId, out var cur) ? cur : "";
+            label.Visible = false;
+            editBtn.Visible = false;
+            aliasEdit.Visible = true;
+            saveBtn.Visible = true;
+            cancelBtn.Visible = true;
+            aliasEdit.Modulate = Colors.White;
+            aliasEdit.TooltipText = "";
+            aliasEdit.GrabFocus();
+            aliasEdit.CaretColumn = aliasEdit.Text.Length;
+        }
+
+        void ExitEditMode()
+        {
+            aliasEdit.Visible = false;
+            saveBtn.Visible = false;
+            cancelBtn.Visible = false;
+            label.Visible = true;
+            editBtn.Visible = true;
+            label.Text = AliasService.Resolve(modId, LoadAliases());
+        }
+
+        void TrySave()
+        {
+            if (TrySaveAlias(modId, aliasEdit.Text, aliasEdit)) ExitEditMode();
+        }
+
+        editBtn.Pressed += EnterEditMode;
+        saveBtn.Pressed += TrySave;
+        cancelBtn.Pressed += ExitEditMode;
+        aliasEdit.TextSubmitted += _ => TrySave();
+        aliasEdit.TextChanged += _ =>
+        {
+            aliasEdit.Modulate = Colors.White;
+            aliasEdit.TooltipText = "";
+        };
+
+        void ApplyVisual(bool isOn)
+        {
+            status.Text = isOn ? "✓" : "✗";
+            status.Modulate = isOn ? new Color(0.4f, 0.95f, 0.45f) : new Color(0.95f, 0.45f, 0.45f);
+            check.Modulate = isOn ? new Color(0.6f, 1.0f, 0.6f) : new Color(0.55f, 0.55f, 0.55f);
+            label.Modulate = isOn ? Colors.White : new Color(0.55f, 0.55f, 0.55f);
+            dragHandle.Modulate = isOn ? Colors.White : new Color(0.55f, 0.55f, 0.55f);
+            orderLabel.Modulate = isOn ? Colors.White : new Color(0.55f, 0.55f, 0.55f);
+        }
+        ApplyVisual(enabled);
+
+        check.Toggled += isOn =>
+        {
+            OnMixedAddonToggle(modId, isOn);
+            ApplyVisual(isOn);
+        };
+
+        var upBtn = new Button { Text = "↑", CustomMinimumSize = new Vector2(32, 32), Disabled = index == 0 };
+        upBtn.Pressed += () => MoveMixedAddon(modId, -1);
+        hbox.AddChild(upBtn);
+
+        var downBtn = new Button { Text = "↓", CustomMinimumSize = new Vector2(32, 32), Disabled = index == total - 1 };
+        downBtn.Pressed += () => MoveMixedAddon(modId, +1);
+        hbox.AddChild(downBtn);
+
+        return hbox;
+    }
+
+    private static void OnMixedAddonToggle(string modId, bool isOn)
+    {
+        try
+        {
+            _pendingMixedAddons ??= ClonePacks(SkinChoicesConfig.LoadOrEmpty(_choicesPath).MixedAddons);
+            var current = _pendingMixedAddons.Enabled.TryGetValue(modId, out var c) ? c : false;
+            if (current == isOn) return;
+            _pendingMixedAddons.Enabled[modId] = isOn;
+            MainFile.Logger.Info($"mixed addon pending toggle: {modId} → {isOn}");
+            UpdateMixedHeader();
+            UpdateCardPackHeader();
+        }
+        catch (Exception ex) { MainFile.Logger.Warn($"mixed addon toggle error: {ex.Message}"); }
+    }
+
+    private static void MoveMixedAddon(string modId, int delta)
+    {
+        try
+        {
+            _pendingMixedAddons ??= ClonePacks(SkinChoicesConfig.LoadOrEmpty(_choicesPath).MixedAddons);
+            var idx = _pendingMixedAddons.Ordering.IndexOf(modId);
+            if (idx < 0) return;
+            var newIdx = idx + delta;
+            if (newIdx < 0 || newIdx >= _pendingMixedAddons.Ordering.Count) return;
+            var item = _pendingMixedAddons.Ordering[idx];
+            _pendingMixedAddons.Ordering.RemoveAt(idx);
+            _pendingMixedAddons.Ordering.Insert(newIdx, item);
+            Callable.From(BuildMixedAddonRows).CallDeferred();
+        }
+        catch (Exception ex) { MainFile.Logger.Warn($"mixed addon reorder error: {ex.Message}"); }
+    }
+
+    public static void HandleMixedAddonDragDropReorder(string sourceModId, string targetModId, bool insertAbove)
+    {
+        try
+        {
+            _pendingMixedAddons ??= ClonePacks(SkinChoicesConfig.LoadOrEmpty(_choicesPath).MixedAddons);
+            var srcIdx = _pendingMixedAddons.Ordering.IndexOf(sourceModId);
+            var targetIdx = _pendingMixedAddons.Ordering.IndexOf(targetModId);
+            if (srcIdx < 0 || targetIdx < 0 || srcIdx == targetIdx) return;
+            var insertIdx = insertAbove ? targetIdx : targetIdx + 1;
+            var item = _pendingMixedAddons.Ordering[srcIdx];
+            _pendingMixedAddons.Ordering.RemoveAt(srcIdx);
+            if (srcIdx < insertIdx) insertIdx--;
+            if (insertIdx < 0) insertIdx = 0;
+            if (insertIdx > _pendingMixedAddons.Ordering.Count) insertIdx = _pendingMixedAddons.Ordering.Count;
+            _pendingMixedAddons.Ordering.Insert(insertIdx, item);
+            Callable.From(BuildMixedAddonRows).CallDeferred();
+        }
+        catch (Exception ex) { MainFile.Logger.Warn($"mixed addon drag-drop error: {ex.Message}"); }
+    }
+
     private static void OnSave()
     {
         try
@@ -855,11 +1170,13 @@ public static class SkinSelectorOverlay
                 if (choices.Characters.TryGetValue(kv.Key, out var c)) c.Active = kv.Value;
             }
             if (_pendingCardPacks != null) choices.CardPacks = ClonePacks(_pendingCardPacks);
+            if (_pendingMixedAddons != null) choices.MixedAddons = ClonePacks(_pendingMixedAddons);
             choices.Save(_choicesPath);
             _pendingActiveByCharacter.Clear();
 
             MainFile.Logger.Info("save → choices.json updated (watcher may also fire; ShowOrReset will dedupe)");
             UpdateCardPackHeader();
+            UpdateMixedHeader();
 
             // Show modal directly so this doesn't depend on the file watcher firing.
             // The watcher may also call ShowOrReset; the second call just resets the countdown.
@@ -879,6 +1196,7 @@ public static class SkinSelectorOverlay
             if (_bootSnapshotCardPacks == null) return;
             _pendingActiveByCharacter.Clear();
             _pendingCardPacks = ClonePacks(_bootSnapshotCardPacks);
+            if (_bootSnapshotMixedAddons != null) _pendingMixedAddons = ClonePacks(_bootSnapshotMixedAddons);
 
             var choices = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
             foreach (var kv in _bootSnapshotActive)
@@ -886,6 +1204,7 @@ public static class SkinSelectorOverlay
                 if (choices.Characters.TryGetValue(kv.Key, out var c)) c.Active = kv.Value;
             }
             choices.CardPacks = ClonePacks(_bootSnapshotCardPacks);
+            if (_bootSnapshotMixedAddons != null) choices.MixedAddons = ClonePacks(_bootSnapshotMixedAddons);
             choices.Save(_choicesPath);
 
             // Restore settings.save card-pack state too so the next launch matches boot.
@@ -905,6 +1224,7 @@ public static class SkinSelectorOverlay
             Callable.From(() =>
             {
                 BuildCardPackRows();
+                BuildMixedAddonRows();
                 RefreshItems();
             }).CallDeferred();
         }
@@ -921,6 +1241,17 @@ public static class SkinSelectorOverlay
         foreach (var kv in pending.Enabled)
         {
             if (!_bootSnapshotCardPacks.Enabled.TryGetValue(kv.Key, out var v) || v != kv.Value) return true;
+        }
+
+        if (_bootSnapshotMixedAddons != null)
+        {
+            var pendingMixed = _pendingMixedAddons ?? new CardPacksConfig();
+            if (!pendingMixed.Ordering.SequenceEqual(_bootSnapshotMixedAddons.Ordering, StringComparer.OrdinalIgnoreCase)) return true;
+            if (pendingMixed.Enabled.Count != _bootSnapshotMixedAddons.Enabled.Count) return true;
+            foreach (var kv in pendingMixed.Enabled)
+            {
+                if (!_bootSnapshotMixedAddons.Enabled.TryGetValue(kv.Key, out var v) || v != kv.Value) return true;
+            }
         }
 
         var disk = SkinChoicesConfig.LoadOrEmpty(_choicesPath);
@@ -1020,6 +1351,8 @@ public static class SkinSelectorOverlay
                     yield return v.ModId;
         }
         foreach (var m in _cardMods) yield return m.ModId;
+        // Mixed mods are already present in _byCharacter (registered as Character variants),
+        // so we don't double-yield them here.
     }
 
     // Saves an alias attempt. Returns true when the alias is accepted (incl. empty = clear);
@@ -1038,7 +1371,7 @@ public static class SkinSelectorOverlay
                 {
                     choices.Save(_choicesPath);
                     MainFile.Logger.Info($"alias cleared: {modId}");
-                    Callable.From(() => { BuildCardPackRows(); RefreshItems(); }).CallDeferred();
+                    Callable.From(() => { BuildCardPackRows(); BuildMixedAddonRows(); RefreshItems(); }).CallDeferred();
                 }
                 return true;
             }
@@ -1061,7 +1394,7 @@ public static class SkinSelectorOverlay
             choices.Aliases[modId] = trimmed;
             choices.Save(_choicesPath);
             MainFile.Logger.Info($"alias saved: {modId} → '{trimmed}'");
-            Callable.From(() => { BuildCardPackRows(); RefreshItems(); }).CallDeferred();
+            Callable.From(() => { BuildCardPackRows(); BuildMixedAddonRows(); RefreshItems(); }).CallDeferred();
             return true;
         }
         catch (Exception ex)
@@ -1077,6 +1410,15 @@ public static class SkinSelectorOverlay
         {
             _pendingCardPacks = ClonePacks(SkinChoicesConfig.LoadOrEmpty(_choicesPath).CardPacks);
             BuildCardPackRows();
+        }).CallDeferred();
+    }
+
+    public static void RefreshMixedAddons()
+    {
+        Callable.From(() =>
+        {
+            _pendingMixedAddons = ClonePacks(SkinChoicesConfig.LoadOrEmpty(_choicesPath).MixedAddons);
+            BuildMixedAddonRows();
         }).CallDeferred();
     }
 
@@ -1132,6 +1474,8 @@ public static class SkinSelectorOverlay
                     }
                     RefreshItems();
                     BuildCardPackRows();
+                    BuildMixedAddonRows();
+                    UpdateMixedHeader();
                     return;
                 }
 
@@ -1148,12 +1492,18 @@ public static class SkinSelectorOverlay
                 _previewRect = null;
                 _previewCaption = null;
                 _previewHovered = false;
-                _cardPackVBox = null;
-                _cardPackHeaderBtn = null;
+                _accordionVBox = null;
+                _outerToggleBtn = null;
+                _outerBody = null;
+                _tabContainer = null;
+                _cardPackTabIndex = -1;
+                _mixedTabIndex = -1;
                 _cardPackSaveBtn = null;
                 _cardPackDiscardBtn = null;
                 _cardPackScroll = null;
                 _cardPackRows = null;
+                _mixedScroll = null;
+                _mixedRows = null;
                 var mainLoop = Engine.GetMainLoop();
                 if (mainLoop is not SceneTree tree) return;
                 var screen = FindCharacterSelectScreen(tree.Root);
@@ -1236,19 +1586,25 @@ public static class SkinSelectorOverlay
             if (_label != null) _label.Text = $"{skinLabel} [{_currentCharacter}]:{dirtyMark}";
 
             var aliases = LoadAliases();
+            var mixedIds = new HashSet<string>(_mixedMods.Select(m => m.ModId), StringComparer.OrdinalIgnoreCase);
             for (var i = 0; i < c.AvailableVariants.Count; i++)
             {
                 var v = c.AvailableVariants[i];
-                var displayText = string.Equals(v, "default", StringComparison.OrdinalIgnoreCase)
-                    ? v
-                    : AliasService.Resolve(v, aliases);
+                var isDefault = string.Equals(v, "default", StringComparison.OrdinalIgnoreCase);
+                var resolved = isDefault ? v : AliasService.Resolve(v, aliases);
+                // 📦 marks mixed mods (bring card art / events in addition to the spine) so the user
+                // knows picking it from the dropdown applies the whole bundle as main + extras.
+                var isMixedItem = !isDefault && mixedIds.Contains(v);
+                var displayText = isMixedItem ? $"📦 {resolved}" : resolved;
                 _opt.AddItem(displayText, i);
                 _opt.SetItemMetadata(i, v);
+                if (isMixedItem) _opt.SetItemTooltip(i, Strings.Get("mixed_indicator_tooltip"));
                 if (string.Equals(v, effectiveActive, StringComparison.OrdinalIgnoreCase))
                 {
                     _opt.Selected = i;
                 }
             }
+            _opt.TooltipText = Strings.Get("mixed_indicator_tooltip");
             UpdateVariantEditBtnState(effectiveActive);
             MainFile.Logger.Info($"OptionButton populated for '{_currentCharacter}': {c.AvailableVariants.Count} items, effective='{effectiveActive}' (disk='{c.Active}', boot='{bootActive}')");
             UpdatePreview(effectiveActive);
