@@ -97,6 +97,16 @@ public partial class MainFile : Node
                         "*** RESTART STS2 ONCE *** for full activation.");
         }
 
+        // Show restart modal only if the persisted settings.save was reordered. That means *next*
+        // boot needs a restart to actually pick up the new load order — without restart, character
+        // mods loaded before us this session still have their Harmony patches live (e.g. Booba's
+        // scale override). In-memory reorder alone has no effect this boot since TryLoadMod calls
+        // already happened in the original order.
+        if (fileReordered)
+        {
+            RestartCountdownModal.ShowOrReset(managerDataDir, 10, "load_order_modal_title", "load_order_modal_body");
+        }
+
         var choicesPath = Path.Combine(managerDataDir, "skin_choices.json");
         var choices = SkinChoicesConfig.LoadOrEmpty(choicesPath);
         foreach (var (character, variants) in byCharacter)
@@ -145,6 +155,32 @@ public partial class MainFile : Node
                 continue;
             }
             RuntimeMountService.MountVariantPck(variant.PckPath);
+        }
+
+        // Block DLL loading for non-active character mods. Without this, mods like
+        // Booba-Necrobinder-Mod register Harmony patches that force-scale every base
+        // necrobinder instance regardless of which skin the user selected.
+        // Only effective if SkinManager loaded first (i.e. fileReordered == false this boot).
+        var keepDllModIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (character, _) in byCharacter)
+        {
+            if (!choices.Characters.TryGetValue(character, out var choice)) continue;
+            if (string.IsNullOrEmpty(choice.Active)) continue;
+            if (string.Equals(choice.Active, "default", StringComparison.OrdinalIgnoreCase)) continue;
+            keepDllModIds.Add(choice.Active);
+        }
+        foreach (var m in mixedMods)
+        {
+            if (choices.MixedAddons.Enabled.TryGetValue(m.ModId, out var en) && en)
+                keepDllModIds.Add(m.ModId);
+        }
+        foreach (var d in characterMods)
+        {
+            if (!keepDllModIds.Contains(d.ModId))
+            {
+                ManagedDllRegistry.Manage(d.ModId);
+                Logger.Info($"  [dll-block] {d.ModId}");
+            }
         }
 
         if (settings != null && cardMods.Count > 0)

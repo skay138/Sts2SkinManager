@@ -4,6 +4,16 @@ All notable changes to Sts2SkinManager are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-05-13
+
+### Added
+- **DLL load blocking for non-active character mods.** Second Harmony patch on `ModManager.TryLoadMod` intercepts and skips DLL load for any character skin mod that isn't the currently selected variant (or an enabled mixed mod). Without this, mods like `Booba-Necrobinder-Mod` would register Harmony patches that force-override `CharacterModel.CreateVisuals` (scale `0.12`, position `(40, -250)`, skeleton swap) on every instance of the base character — even when you'd selected a completely different skin. Block list rebuilds every boot from `skin_choices.json`.
+- **Restart modal on first-boot self-bootstrap.** When `LoadOrderEnforcer` reorders `settings.save` to put SkinManager first in the mod list, a 10-second countdown modal now appears (previously only a `Logger.Warn` line). Without restart, this session's character mods that loaded before SkinManager still have their Harmony patches live; the restart is what makes blocking actually take effect.
+- 16-language coverage for the new `load_order_modal_title` / `load_order_modal_body` strings.
+
+### Changed
+- `RestartCountdownModal.ShowOrReset` accepts optional `titleKey` / `bodyKey` parameters so the same modal infrastructure can carry different copy for the load-order vs. skin-change cases.
+
 ## [0.6.0] - 2026-05-13
 
 ### Added

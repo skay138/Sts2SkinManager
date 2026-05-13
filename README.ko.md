@@ -28,13 +28,15 @@
 
 `ProjectSettings.LoadResourcePack` Harmony patch 가 모드 부팅을 가로챔. 매니저가 `skin_choices.json` 을 읽어 캐릭터 actor instantiate 전에 variant 를 mount 하고, 카드 스킨 활성/순서 상태를 STS2 `settings.save` 에 기록.
 
+`ModManager.TryLoadMod` 에 두 번째 Harmony patch — 활성화하지 않은 캐릭터 모드의 **DLL** 자체를 차단함. 이게 없으면 `Booba-Necrobinder-Mod` 같은 모드가 Harmony patch 로 자기가 선택되지 않았어도 모든 해당 캐릭터에 scale/position/skeleton 강제 변경을 적용함. 차단 목록은 매 부팅마다 `skin_choices.json` 기준으로 재계산 — 선택된 variant 와 enabled mixed mod 만 DLL 살아남음.
+
 선택을 변경하면 `skin_choices.json` 갱신 + 10초 카운트다운 모달 표시. 확인 시 자동 재시작, 취소 시 변경은 대기 상태 유지. Discard 는 부팅 시점 상태로 모든 것을 복원.
 
 ## 설치
 
 1. 최신 release zip 다운로드.
 2. `Sts2SkinManager` 폴더를 `<Slay the Spire 2 설치 경로>/mods/` 에 복사.
-3. 첫 부팅은 self-bootstrap (mod load order 재정렬) 1회 발생. 한 번 더 재시작하면 완전 활성화.
+3. 첫 부팅은 self-bootstrap (mod load order 재정렬) 1회 발생 → 10초 카운트다운 모달이 자동으로 Steam 재시작을 권유함 → 확인 누르면 적용. 이 재시작을 안 하면 SkinManager 보다 먼저 로드된 캐릭터 mod 의 강제 변경(scale 등) 이 이번 세션엔 남아있음.
 
 ## 사용법
 

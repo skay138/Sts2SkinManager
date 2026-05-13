@@ -30,7 +30,7 @@ Slay the Spire 2's modding scene has plenty of character skins (Mesugaki for Reg
 [list=1]
 [*] Download the latest release zip.
 [*] Extract the [color=#ffcc00]Sts2SkinManager[/color] folder into [color=#ffcc00]<Slay the Spire 2 install>/mods/[/color].
-[*] First boot does a one-time self-bootstrap (rewrites load order). Restart STS2 once more and you're set.
+[*] First boot does a one-time self-bootstrap (rewrites load order). A 10-second countdown modal offers auto-restart through Steam — confirm to apply.
 [*] On Character Select you'll see the [color=#ffcc00]Skin [character]:[/color] dropdown and the [color=#ffcc00]Card skins[/color] panel.
 [/list]
 
@@ -39,6 +39,8 @@ Slay the Spire 2's modding scene has plenty of character skins (Mesugaki for Reg
 Any character skin mod that overrides paths under [color=#ffcc00]res://animations/characters/{characterId}/[/color], and any card-art / portrait mod that overrides [color=#ffcc00]card_art/...[/color] or ships [color=#ffcc00]card_portraits/[/color]. Mod authors don't need to do anything special.
 
 [b]Plays nicely with custom-character mods.[/b] Mods that add brand-new characters (e.g. Ryoshu) share the [color=#ffcc00]animations/characters/{char}/[/color] path pattern with skin mods, so an earlier build would intercept their [color=#ffcc00].pck[/color] and the new character would disappear from Character Select. SkinManager now reads the base-game roster from [color=#ffcc00]SlayTheSpire2.pck[/color] and only manages mods that target a [i]base[/i] character — custom characters stay auto-mountable, no conflict.
+
+[b]Blocks forced overrides from non-active skin mods.[/b] Some character skin mods (e.g. [color=#ffcc00]Booba-Necrobinder-Mod[/color]) register Harmony patches that apply scale / position / skeleton overrides to every instance of the base character — even when you've selected a different skin. SkinManager intercepts [color=#ffcc00]ModManager.TryLoadMod[/color] and prevents the [b]DLL[/b] of non-active character mods from loading, so unselected skins can't interfere with the one you actually picked.
 
 [b]For skin authors[/b] — drop a [color=#ffcc00]preview.png[/color] (or .jpg / .jpeg / .webp) next to your [color=#ffcc00].pck[/color] and the manager will use it for hover preview. Optional — the manager auto-extracts one from the [color=#ffcc00].pck[/color] if you don't ship one.
 

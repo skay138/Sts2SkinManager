@@ -10,25 +10,35 @@ namespace Sts2SkinManager.Runtime;
 public static class RestartCountdownModal
 {
     private const int DefaultSeconds = 10;
+    private const string DefaultTitleKey = "modal_title";
+    private const string DefaultBodyKey = "modal_body";
     private static NVerticalPopup? _popup;
     private static Godot.Timer? _timer;
     private static int _remaining;
     private static string _managerDataDir = "";
     private static bool _resolved;
     private static Action? _onCancelCallback;
+    private static string _titleKey = DefaultTitleKey;
+    private static string _bodyKey = DefaultBodyKey;
 
     public static void ShowOrReset(string managerDataDir, int seconds, Action? onCancel)
     {
         _onCancelCallback = onCancel;
-        ShowOrResetInner(managerDataDir, seconds);
+        ShowOrResetInner(managerDataDir, seconds, DefaultTitleKey, DefaultBodyKey);
     }
 
     public static void ShowOrReset(string managerDataDir, int seconds = DefaultSeconds)
     {
-        ShowOrResetInner(managerDataDir, seconds);
+        ShowOrResetInner(managerDataDir, seconds, DefaultTitleKey, DefaultBodyKey);
     }
 
-    private static void ShowOrResetInner(string managerDataDir, int seconds)
+    public static void ShowOrReset(string managerDataDir, int seconds, string titleKey, string bodyKey, Action? onCancel = null)
+    {
+        _onCancelCallback = onCancel;
+        ShowOrResetInner(managerDataDir, seconds, titleKey, bodyKey);
+    }
+
+    private static void ShowOrResetInner(string managerDataDir, int seconds, string titleKey, string bodyKey)
     {
         var mainLoop = Engine.GetMainLoop();
         if (mainLoop is not SceneTree tree)
@@ -44,6 +54,8 @@ public static class RestartCountdownModal
                 _managerDataDir = managerDataDir;
                 _remaining = seconds;
                 _resolved = false;
+                _titleKey = titleKey;
+                _bodyKey = bodyKey;
 
                 if (_popup != null && GodotObject.IsInstanceValid(_popup))
                 {
@@ -75,7 +87,7 @@ public static class RestartCountdownModal
             }
             var popup = packed.Instantiate<NVerticalPopup>();
             tree.Root.AddChild(popup);
-            popup.SetText(Strings.Get("modal_title"), BuildBody());
+            popup.SetText(Strings.Get(_titleKey), BuildBody());
             popup.YesButton.SetText(Strings.Get("btn_restart_now"));
             popup.YesButton.IsYes = true;
             popup.YesButton.Released += _ => OnYes();
@@ -123,11 +135,11 @@ public static class RestartCountdownModal
     {
         if (_popup != null && GodotObject.IsInstanceValid(_popup))
         {
-            _popup.SetText(Strings.Get("modal_title"), BuildBody());
+            _popup.SetText(Strings.Get(_titleKey), BuildBody());
         }
     }
 
-    private static string BuildBody() => Strings.Get("modal_body", _remaining);
+    private static string BuildBody() => Strings.Get(_bodyKey, _remaining);
 
     private static void OnYes()
     {

@@ -28,13 +28,15 @@ A Slay the Spire 2 mod that manages installed **character skin mods**, **card sk
 
 A Harmony patch on `ProjectSettings.LoadResourcePack` intercepts mod boot. The manager reads `skin_choices.json`, mounts the chosen character variant before the character actor is instantiated, and writes the chosen card-skin enable/order state to STS2's `settings.save`.
 
+A second Harmony patch on `ModManager.TryLoadMod` blocks the **DLL** of non-active character mods — without this, mods like `Booba-Necrobinder-Mod` register Harmony patches that force-override the character (scale, position, skeleton) regardless of which skin you actually selected. Block list is rebuilt on every boot from `skin_choices.json`; the active variant (and any enabled mixed mod) keeps its DLL.
+
 Changing your selection writes to `skin_choices.json` and pops a 10-second countdown modal. Confirm to auto-restart; cancel keeps the change queued. Discard restores everything to the state STS2 booted with.
 
 ## Install
 
 1. Download the latest release zip.
 2. Extract the `Sts2SkinManager` folder into `<Slay the Spire 2 install>/mods/`.
-3. First boot does a one-time self-bootstrap (rewrites mod load order so the manager loads first). Restart STS2 once more for full activation.
+3. First boot does a one-time self-bootstrap (rewrites mod load order so the manager loads first). A 10-second countdown modal will offer auto-restart through Steam — confirm to apply. Without this restart, character mods that loaded before SkinManager keep their forced overrides (scale, etc.) for this session.
 
 ## Usage
 
