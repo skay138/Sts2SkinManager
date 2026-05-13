@@ -51,6 +51,12 @@ public class SkinChoicesConfig
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
+    // When set (by MainFile at boot), every Save() also writes the same JSON to this path —
+    // letting a curator zip their `mods/` folder and have their preset travel with it. The
+    // receiving end auto-imports from this same path when user_data has no choices yet.
+    // Mirror failures are logged but never propagate; preset write must not block user actions.
+    public static string? PresetMirrorPath { get; set; }
+
     public static SkinChoicesConfig LoadOrEmpty(string path)
     {
         if (!File.Exists(path)) return new SkinChoicesConfig();
@@ -128,7 +134,23 @@ public class SkinChoicesConfig
             if (aliasNode != null) root["_aliases"] = aliasNode;
         }
 
-        File.WriteAllText(path, root.ToJsonString(JsonOpts));
+        var json = root.ToJsonString(JsonOpts);
+        File.WriteAllText(path, json);
+
+        var mirror = PresetMirrorPath;
+        if (!string.IsNullOrEmpty(mirror) && !string.Equals(mirror, path, StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var mirrorDir = Path.GetDirectoryName(mirror);
+                if (!string.IsNullOrEmpty(mirrorDir)) Directory.CreateDirectory(mirrorDir);
+                File.WriteAllText(mirror, json);
+            }
+            catch (Exception ex)
+            {
+                MainFile.Logger.Warn($"preset mirror write failed ({mirror}): {ex.Message}");
+            }
+        }
     }
 
     // Same algorithm as SyncCardPacks but operates on MixedAddons.

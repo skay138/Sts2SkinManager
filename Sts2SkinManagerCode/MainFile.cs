@@ -108,6 +108,28 @@ public partial class MainFile : Node
         }
 
         var choicesPath = Path.Combine(managerDataDir, "skin_choices.json");
+
+        // Modpack preset: a curator can ship `mods/Sts2SkinManager/modpack_preset.json` alongside
+        // their mod bundle. When a fresh install has no user-side choices yet, we seed from it so
+        // the recipient just unzips and plays. After seeding, the user_data file becomes the truth
+        // and every Save() mirrors back to the preset path — so re-zipping `mods/` always carries
+        // the latest selection forward. Mod-update zips MUST NOT contain modpack_preset.json or
+        // they'll overwrite recipient selections.
+        var presetPath = Path.Combine(modsDir, ModId, "modpack_preset.json");
+        if (!File.Exists(choicesPath) && File.Exists(presetPath))
+        {
+            try
+            {
+                File.Copy(presetPath, choicesPath);
+                Logger.Info($"seeded skin_choices.json from modpack preset ({presetPath}).");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"preset seed failed: {ex.Message}");
+            }
+        }
+        SkinChoicesConfig.PresetMirrorPath = presetPath;
+
         var choices = SkinChoicesConfig.LoadOrEmpty(choicesPath);
         foreach (var (character, variants) in byCharacter)
         {

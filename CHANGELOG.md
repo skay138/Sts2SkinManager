@@ -4,6 +4,16 @@ All notable changes to Sts2SkinManager are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-05-13
+
+### Added
+- **Modpack preset sharing.** Every Save now mirrors the current selection to `<sts2>/mods/Sts2SkinManager/modpack_preset.json`. To share a full modpack with a friend, zip your `mods/` folder and send it — on first launch their `skin_choices.json` is seeded from the bundled preset, so dropdown picks, card-skin order, and mixed-mod toggles all apply automatically without anyone having to touch the Roaming/AppData folder.
+- README "Sharing your setup" section in both EN and KO with a warning that Nexus release zips must not contain `modpack_preset.json`.
+
+### Notes
+- Preset seeding only happens when `<user_data>/Sts2SkinManager/skin_choices.json` doesn't exist yet. Existing users with saved choices are unaffected.
+- If a preset references a mod that isn't installed on the recipient's machine, that selection falls back to `default` via the existing `SyncAvailableVariants` path. The recipient's `Save` then mirrors the fallback back into the preset, so re-sharing carries the corrected state forward.
+
 ## [0.7.0] - 2026-05-13
 
 ### Added
