@@ -22,6 +22,7 @@ A Slay the Spire 2 mod that manages installed **character skin mods**, **card sk
   - Sources: `preview.png` next to the `.pck` if provided; otherwise auto-extracted from the `.pck` (character-select art for characters, first card art for card packs). No live spine swap involved.
 - **Batch Save / Discard** — both panels share a single Save button. Make all your changes, click Save once, restart once.
 - **Auto-restart via Steam** — confirm and the mod relaunches STS2 through Steam (~5-10s). Cancel and the change stays queued until next launch (Discard to fully revert).
+- **Configurable overlay position** — defaults to the **top-right** corner of Character Select (dodges the multiplayer lobby panel and other top-left UI the game itself parks there). With [Nexus ModConfig](https://www.nexusmods.com/slaythespire2/mods/27) installed, flip it back to **top-left** (the v0.8 layout) via an in-game dropdown — change applies immediately, no restart.
 - **Multi-language UI** — follows the game's current language. 16 languages supported; unsupported fall back to English.
 
 ## How it works
@@ -42,8 +43,8 @@ Changing your selection writes to `skin_choices.json` and pops a 10-second count
 
 Launch STS2 → Character Select.
 
-- **Top-left**: `Skin [<character>]:` dropdown. Click a character, pick a variant.
-- **Right of dropdown**: 👁 hover icon (only visible when the selected variant differs from the currently-applied one and a preview is available) → hover to see the skin's character-select art on the right side of the screen.
+- **Top-right** (default; switch to top-left via [ModConfig](https://www.nexusmods.com/slaythespire2/mods/27) if you prefer): `Skin [<character>]:` dropdown. Click a character, pick a variant.
+- **Opposite side of dropdown** (left in top-right mode, right in top-left mode): 👁 hover icon (only visible when the selected variant differs from the currently-applied one and a preview is available) → hover to see the skin's character-select art.
 - **Below dropdown**: `Card skins (N/M)` panel with check, order number, ↑/↓, drag handle. Toggle, reorder by arrow or drag-and-drop. Hover a row's label to preview the first card art from that pack.
 - Make any combination of changes → click **Save** → restart modal appears → **Restart now** or **Restart later** (changes stay queued until next launch).
 - **Discard** rolls everything back to the boot state.

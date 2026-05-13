@@ -22,6 +22,7 @@ Slay the Spire 2's modding scene has plenty of character skins (Mesugaki for Reg
 [*] [b]Rename mods inline[/b] — give any character variant or card skin a friendly display name. Click ✏️, type, ✓ to save (or Enter), ✕ to cancel. The mod ID stays as the unique key under the hood; aliases never break matching. Collisions with other IDs/aliases are rejected inline with a red highlight and tooltip.
 [*] [b]Unified Save / Discard[/b] — every panel shares a single Save button. Make any combination of changes, click Save once, one modal, one restart. Discard rolls everything back to the boot state.
 [*] [b]Auto-restart via Steam[/b] — confirm the modal and the mod relaunches STS2 through Steam (~5-10s). Cancel keeps your changes queued for next launch.
+[*] [b]Configurable overlay position (new in v0.9.0)[/b] — the Character Select overlay is now docked to the [b]top-right[/b] corner by default, dodging the multiplayer lobby panel and other top-left UI the game itself parks there. Install the optional [url=https://www.nexusmods.com/slaythespire2/mods/27]ModConfig[/url] mod and you'll get an in-game dropdown to switch back to the original top-left layout — change applies immediately, no restart.
 [*] [b]Multi-language UI[/b] — follows the game's current language. 16 locales bundled, English fallback.
 [/list]
 
@@ -72,4 +73,5 @@ sts2, skin manager, character skin, card skin, card portraits, mod manager, ui m
 None. Works standalone.
 
 ## Optional dependencies
-Any character skin or card skin mod you want to manage.
+- Any character skin or card skin mod you want to manage.
+- [url=https://www.nexusmods.com/slaythespire2/mods/27]ModConfig[/url] — optional. Without it, the overlay uses the default top-right position. With it installed, you get an in-game dropdown to switch the overlay between top-right and top-left.

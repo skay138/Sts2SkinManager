@@ -99,6 +99,84 @@ public static class SkinSelectorOverlay
         Callable.From(() => DoAttach(screen)).CallDeferred();
     }
 
+    public enum OverlayAnchor { Left, Right }
+    private static OverlayAnchor _overlayAnchor = OverlayAnchor.Right;
+
+    // ModConfigBridge calls this on startup (persisted value) and on user change.
+    // Accepts "Top Left" / "Top Right" (case-insensitive), with prefix match so "Left"/"Right" also work.
+    public static void SetAnchor(string? value)
+    {
+        var anchor = value != null && value.IndexOf("Left", StringComparison.OrdinalIgnoreCase) >= 0
+            ? OverlayAnchor.Left
+            : OverlayAnchor.Right;
+        if (anchor == _overlayAnchor) return;
+        _overlayAnchor = anchor;
+        Reposition();
+    }
+
+    private static void Reposition()
+    {
+        if (_hbox != null && GodotObject.IsInstanceValid(_hbox)) PositionHbox(_hbox);
+        if (_previewContainer != null && GodotObject.IsInstanceValid(_previewContainer)) PositionPreview(_previewContainer);
+        if (_accordionVBox != null && GodotObject.IsInstanceValid(_accordionVBox)) PositionAccordion(_accordionVBox);
+    }
+
+    private static void PositionHbox(Control c)
+    {
+        if (_overlayAnchor == OverlayAnchor.Left)
+            AnchorTopLeft(c, width: 420, height: 56, offsetLeft: 40, offsetTop: 40);
+        else
+            AnchorTopRight(c, width: 420, height: 56, offsetRight: 40, offsetTop: 40);
+    }
+
+    // Preview sits opposite to the dropdown: right of hbox in Left mode, left of hbox in Right mode.
+    // 540 inset preserves the original 80px gap (hbox is 420 wide + 40 base margin + 80 gap).
+    private static void PositionPreview(Control c)
+    {
+        if (_overlayAnchor == OverlayAnchor.Left)
+            AnchorTopLeft(c, width: 240, height: 280, offsetLeft: 540, offsetTop: 40);
+        else
+            AnchorTopRight(c, width: 240, height: 280, offsetRight: 540, offsetTop: 40);
+    }
+
+    private static void PositionAccordion(Control c)
+    {
+        if (_overlayAnchor == OverlayAnchor.Left)
+            AnchorTopLeft(c, width: 480, height: 40, offsetLeft: 40, offsetTop: 110);
+        else
+            AnchorTopRight(c, width: 480, height: 40, offsetRight: 40, offsetTop: 110);
+    }
+
+    // Anchors a control to the parent's TOP-LEFT corner.
+    private static void AnchorTopLeft(Control c, float width, float height, float offsetLeft, float offsetTop)
+    {
+        c.AnchorLeft = 0f;
+        c.AnchorRight = 0f;
+        c.AnchorTop = 0f;
+        c.AnchorBottom = 0f;
+        c.OffsetLeft = offsetLeft;
+        c.OffsetRight = offsetLeft + width;
+        c.OffsetTop = offsetTop;
+        c.OffsetBottom = offsetTop + height;
+        c.GrowHorizontal = Control.GrowDirection.End;
+        c.GrowVertical = Control.GrowDirection.End;
+    }
+
+    // Anchors a control to the parent's TOP-RIGHT corner.
+    private static void AnchorTopRight(Control c, float width, float height, float offsetRight, float offsetTop)
+    {
+        c.AnchorLeft = 1f;
+        c.AnchorRight = 1f;
+        c.AnchorTop = 0f;
+        c.AnchorBottom = 0f;
+        c.OffsetLeft = -(offsetRight + width);
+        c.OffsetRight = -offsetRight;
+        c.OffsetTop = offsetTop;
+        c.OffsetBottom = offsetTop + height;
+        c.GrowHorizontal = Control.GrowDirection.Begin;
+        c.GrowVertical = Control.GrowDirection.End;
+    }
+
     private static void DoAttach(Node screen)
     {
         try
@@ -112,9 +190,9 @@ public static class SkinSelectorOverlay
 
             var hbox = new HBoxContainer
             {
-                Position = new Vector2(40, 40),
                 CustomMinimumSize = new Vector2(420, 56),
             };
+            PositionHbox(hbox);
             _hbox = hbox;
             _label = new Label
             {
@@ -210,10 +288,10 @@ public static class SkinSelectorOverlay
     {
         var container = new VBoxContainer
         {
-            Position = new Vector2(540, 40),
             CustomMinimumSize = new Vector2(240, 280),
             MouseFilter = Control.MouseFilterEnum.Stop,
         };
+        PositionPreview(container);
         _previewContainer = container;
         container.MouseEntered += OnPreviewHoverStart;
         container.MouseExited += OnPreviewHoverEnd;
@@ -512,9 +590,9 @@ public static class SkinSelectorOverlay
     {
         var vbox = new VBoxContainer
         {
-            Position = new Vector2(40, 110),
             CustomMinimumSize = new Vector2(480, 40),
         };
+        PositionAccordion(vbox);
         _accordionVBox = vbox;
 
         // Top row — toggle (compact) + Save / Discard always visible alongside.

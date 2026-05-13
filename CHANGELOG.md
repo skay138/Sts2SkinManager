@@ -4,6 +4,15 @@ All notable changes to Sts2SkinManager are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-05-14
+
+### Added
+- **Configurable overlay anchor.** The character-select overlay can now be docked to either the **top-left** (original layout) or the **top-right** corner. Switch live via the optional [ModConfig (Nexus #27)](https://www.nexusmods.com/slaythespire2/mods/27) dropdown — *Overlay position (character select)*. Without ModConfig installed, the mod silently uses the default.
+- Overlay layout is now **anchor-based** instead of absolute pixel coordinates — stays correctly placed across resolutions and aspect ratios. `AnchorTopLeft` / `AnchorTopRight` helpers in `SkinSelectorOverlay`; `ModConfigBridge.cs` mirrors the reflection-based pattern used by Sts2ShopVarianceTuner (zero hard dependency on ModConfig).
+
+### Changed
+- **Overlay default position is now Top Right** (was Top Left in v0.8 and earlier). The change avoids collision with the multiplayer lobby panel and other UI the game itself parks in the top-left corner of Character Select. Users who prefer the original layout can flip it back to Top Left via the ModConfig dropdown — the change applies immediately, no restart required.
+
 ## [0.8.0] - 2026-05-13
 
 ### Added

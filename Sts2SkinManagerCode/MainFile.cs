@@ -221,6 +221,10 @@ public partial class MainFile : Node
 
         SkinSelectorOverlay.Configure(choicesPath, byCharacter, cardMods, mixedMods);
         SkinSelectorOverlay.SetWatcher(_watcher);
+
+        // Defer ModConfig registration so the framework's own Initialize can run first.
+        if (Engine.GetMainLoop() is SceneTree tree)
+            tree.CreateTimer(0.0).Timeout += ModConfigBridge.TryRegister;
     }
 
     private static ChoicesFileWatcher? _watcher;
