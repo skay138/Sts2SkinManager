@@ -4,6 +4,17 @@ All notable changes to Sts2SkinManager are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-05-15
+
+### Added
+- **Recursive `mods/` scan.** Skin Manager's pck discovery now walks the entire `mods/` tree at any depth, so users can organize pcks under category folders like `mods/Characters/`, `mods/Artwork/`, `mods/Utility/` and they'll still be picked up. Hidden / `__MACOSX` / dotted folders are skipped. Duplicate pck filenames across subfolders log a warning and the first occurrence wins.
+
+### Documentation
+- README EN/KO clarify that STS2 itself also walks `mods/` recursively (`ModManager.ReadModsInDirRecursive`), so DLL+manifest+pck bundles work at any depth — **delete the original `mods/<modName>/` folder after relocating**, otherwise the framework discovers both copies and reports `DUPLICATE_ID`.
+
+### Internal
+- Auto-junction prototype (PR #2/#3) was reverted in PR #4 once `sts2.dll` decompilation confirmed the framework already handles nested mod folders natively. No runtime shim is needed.
+
 ## [0.9.0] - 2026-05-14
 
 ### Added
