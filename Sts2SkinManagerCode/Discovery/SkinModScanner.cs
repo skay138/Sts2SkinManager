@@ -61,7 +61,11 @@ public static class SkinModScanner
     private static bool ShouldSkipDir(string dirName) =>
         dirName.StartsWith(".") || string.Equals(dirName, "__MACOSX", StringComparison.OrdinalIgnoreCase);
 
-    public static List<DetectedSkinMod> Scan(string modsDir, IReadOnlySet<string> baseCharacters, out List<string> skippedCustomCharacterMods)
+    public static List<DetectedSkinMod> Scan(
+        string modsDir,
+        IReadOnlySet<string> baseCharacters,
+        out List<string> skippedCustomCharacterMods,
+        IReadOnlyDictionary<string, string>? dllSkinAssignments = null)
     {
         var result = new List<DetectedSkinMod>();
         skippedCustomCharacterMods = new List<string>();
@@ -98,6 +102,22 @@ public static class SkinModScanner
                 continue;
             }
             seenModIds[pckId] = pck;
+
+            // DLL-driven character skin assignment overrides path-based detection. The mod's pck
+            // doesn't carry standard skin paths (private namespace like Hcxmmx_King_Skin), but the
+            // user already confirmed via the post-Harmony-inspection modal that it skins a base
+            // character. Treat it as a regular Character variant from now on so v0.7.0 DLL block
+            // and dropdown selection apply uniformly.
+            if (dllSkinAssignments != null && dllSkinAssignments.TryGetValue(pckId, out var assignedChar))
+            {
+                if (baseCharacters.Count == 0 || baseCharacters.Contains(assignedChar))
+                {
+                    result.Add(new DetectedSkinMod(pckId, modDir, pck, SkinModKind.Character,
+                        new List<string> { assignedChar.ToLowerInvariant() }, previewPath));
+                    continue;
+                }
+                MainFile.Logger.Warn($"dll skin assignment '{pckId}' → '{assignedChar}' references unknown base character; ignoring.");
+            }
 
             if (chars.Count > 0)
             {

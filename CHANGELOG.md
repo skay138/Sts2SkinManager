@@ -4,6 +4,63 @@ All notable changes to Sts2SkinManager are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.4] - 2026-05-15
+
+### Changed — character suggestion algorithm rewrite
+- **Dual-encoding byte-pattern matching.** v0.11.0–.3 character suggester only scanned ASCII bytes — but every .NET-based mod stores its `CHARACTER.{X}` enum constants and `ResourceLoader.Load("res://...")` path strings as UTF-16 in the assembly user-string heap. Without UTF-16 awareness we were blind to the most reliable signal in any DLL-driven character skin (Hcxmmx_Touhou_Sakuya_Skin.dll has `SILENT` ×2 in UTF-16 and zero ASCII hits).
+- **Weighted scoring with dominance rule.** New scoring per character id:
+  - `+5` per `characters/{id}/` ASCII match in pck (literal asset override)
+  - `+5` per `characters/{id}/` UTF-16 match in dll (ResourceLoader path)
+  - `+3` per `{ID_UPPERCASE}` UTF-16 match in dll (CHARACTER.{X} enum)
+  - `+1` per `{id}` UTF-16 match in dll (any user-string ref)
+  
+  Selection requires top score ≥ 4 AND top score ≥ 2× runner-up. ASCII-inside-DLL matches are intentionally not scored (random alignment inside DLL metadata produces noisy hits — Sts2CardAdvisor's DLL has 16-66 ASCII matches per character, would have falsely-classified to "defect" under v0.11.3).
+- **Why this scales without per-mod maintenance:** any mod that targets a single base character must reference that character's id somewhere in its IL — as an enum constant, an asset path, or a string literal. Mods that touch every character (advisors, save tools) hit no clear single dominant character. The detection now follows directly from "what does the binary actually reference," not from hand-curated keywords or type whitelists.
+
+### Detection priority (final)
+1. Concrete-character patch on `CharacterModel.{Defect/Ironclad/...}` — strongest signal, used as-is.
+2. Dual-encoding byte-pattern scan (this release) — handles all mainstream DLL-driven skin patterns.
+3. Manifest keyword scan (v0.11.3) — fallback for the tiny fraction of mods whose IL has zero character refs (mods that load asset paths via reflection-built strings).
+4. Otherwise: log as ambiguous with manifest excerpt + manual-edit instructions.
+
+## [0.11.3] - 2026-05-15
+
+### Added
+- **Manifest keyword fallback for character suggestion.** When the byte-frequency suggester finds zero base-character hits in a mod's pck/dll (common for mods authored outside the English-speaking community — e.g. `Hcxmmx_Touhou_Sakuya_Skin`'s description says "替换静默猎手外观" with no English "silent" anywhere in the binary), Skin Manager now scans the mod's `mod_manifest.json` `name` + `description` against a localized keyword table (English + Simplified/Traditional Chinese + Japanese + Korean) and uses the result as a third-tier fallback.
+- **Ambiguous-mod logs now print manifest excerpt.** When all three suggesters fail, the log line includes the mod's manifest `name` and (truncated) `description` so the user can see at a glance what character it likely targets, plus a copy-paste JSON snippet for adding to `_dll_skin_assignments` or `_dll_skin_skipped`.
+
+### Detection priority
+1. Concrete-character patch (`CharacterModel.Defect/Ironclad/Necrobinder/Regent/Silent`) — strongest signal, used as-is.
+2. Byte-frequency over pck + dll bytes — single dominant base-character ID.
+3. Manifest keyword scan — localized character names in `name`/`description`.
+4. Otherwise: log as ambiguous with manifest excerpt + manual-edit instructions.
+
+## [0.11.2] - 2026-05-15
+
+### Added
+- **Wider Harmony spine whitelist.** Detection now also flags patches on the concrete character subclasses (`MegaCrit.Sts2.Core.Models.Characters.Defect/Ironclad/Necrobinder/Regent/Silent`), `NCharacterSelectScreen`, `NTopBarPortrait`, and `NVfxSpine`. A patch on a concrete character class short-circuits straight to that character — no byte-frequency guess needed.
+- **Forensic boot log for unclassified DLL+pck mods.** Every boot, Skin Manager prints a list of mods that ship both a `.dll` and a `.pck` but have neither standard skin paths in their pck nor Harmony patches on a whitelisted type. For each, the byte-frequency suggester also prints its best character guess (or "no hint"). This gives the user a durable trail for DLL-skin patterns we don't yet auto-detect — they can copy the printed JSON snippet into `_dll_skin_assignments` (to manage) or `_dll_skin_skipped` (to silence).
+- **Visibility log for existing assignments / skipped.** Every boot lists current `_dll_skin_assignments` and `_dll_skin_skipped` contents so the user doesn't need to grep the JSON to see what Skin Manager believes.
+
+## [0.11.1] - 2026-05-15
+
+### Fixed
+- **False positives from sister mods.** The v0.11.0 dll-skin sweep flagged Sts2CardAdvisor (and would have flagged any inggom Sts2-prefixed sister mod) as a possible character skin because it patches `NCharacterSelectButton` for advisor-overlay reasons. Auto-blocking that mod's DLL would silently disable the advisor on the next boot. Mods whose id starts with `Sts2` are now skipped before suggestion, alongside an explicit non-skin allowlist (`BaseLib` etc.).
+- **"Restart later" no longer leaves stale assignments.** Cancelling the v0.11 dll-skin restart modal previously kept the auto-written `_dll_skin_assignments` on disk, so the next boot would still apply them. Cancel now reverts only the keys that this session added (pre-existing assignments are preserved).
+
+### Migration note
+- If you booted v0.11.0 once with sister mods installed, open `<user_data>/Sts2SkinManager/skin_choices.json` and remove any `_dll_skin_assignments` entries pointing at `Sts2*` mods (e.g. `"Sts2CardAdvisor": "ironclad"`). v0.11.1 won't add them back.
+
+## [0.11.0] - 2026-05-15
+
+### Added
+- **DLL-driven character skin auto-detection.** Mods that swap a base character via Harmony patches (rather than overriding `animations/characters/{char}/...` paths in their pck — e.g. Hcxmmx_King_Skin replacing the Regent with Dead Cells' King) are now picked up automatically. After every other mod finishes initializing, Skin Manager walks `Harmony.GetAllPatchedMethods()` and flags any mod whose patches touch character-spine types (`CharacterModel`, `NCreatureVisuals`, `NCharacterSelectButton`, `MegaSprite`, `NMerchantCharacter`, `NRestSiteCharacter`). For each flagged mod, a byte-frequency scan over its pck + dll suggests which base character it targets; high-confidence matches get auto-assigned and a single restart modal lets you toggle them like any other skin from the next boot onward.
+- New `_dll_skin_assignments` (modId → base character id) and `_dll_skin_skipped` (mods you marked as not-a-skin) keys in `skin_choices.json`. Once assigned, the v0.7.0 DLL-load block path automatically blocks the DLL when a different variant is selected.
+- 16-language coverage for the new `dll_skin_modal_title` / `dll_skin_modal_body_summary` keys (full translations for EN/KO/JA/ZHS/ZHT/DE/FR/ES/IT/PT-BR/PT/PL/RU/TH/TR; ESP shares SPA).
+
+### Internal
+- New `Discovery/HarmonyPatchInspector.cs` (whitelist-driven Harmony scan + assembly→modId map), `Discovery/CharacterIdSuggester.cs` (token-boundary base-character-id frequency counter, threshold 3+ hits with margin 2), `Runtime/DllSkinDetectionService.cs` (defers 2 s after Initialize, writes assignments + shows modal). `SkinModScanner.Scan` now accepts an optional assignments dict and injects assigned mods as Character variants even when their pck has zero standard skin paths.
+
 ## [0.10.0] - 2026-05-15
 
 ### Added

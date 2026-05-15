@@ -51,7 +51,13 @@ public partial class MainFile : Node
         var baseCharacters = SkinModScanner.ScanBaseCharacters(gameDir);
         Logger.Info($"base character roster ({baseCharacters.Count}): [{string.Join(", ", baseCharacters.OrderBy(x => x))}]");
 
-        var detected = SkinModScanner.Scan(modsDir, baseCharacters, out var skippedCustom);
+        // Read existing DLL-skin assignments BEFORE scanning, so the scanner can inject
+        // assignments-only mods (e.g. Hcxmmx_King_Skin) as Character variants even though their
+        // pck has no animations/characters/{base}/ paths.
+        var preliminaryChoicesPath = Path.Combine(managerDataDir, "skin_choices.json");
+        var preliminaryDllAssignments = SkinChoicesConfig.LoadOrEmpty(preliminaryChoicesPath).DllSkinAssignments;
+
+        var detected = SkinModScanner.Scan(modsDir, baseCharacters, out var skippedCustom, preliminaryDllAssignments);
         var characterMods = detected.Where(d => d.Kind == SkinModKind.Character).ToList();
         var cardMods = detected.Where(d => d.Kind == SkinModKind.Cards).ToList();
 
@@ -224,7 +230,17 @@ public partial class MainFile : Node
 
         // Defer ModConfig registration so the framework's own Initialize can run first.
         if (Engine.GetMainLoop() is SceneTree tree)
+        {
             tree.CreateTimer(0.0).Timeout += ModConfigBridge.TryRegister;
+
+            // After all other mods finish their Harmony patches, sweep for DLL-driven character
+            // skins (Hcxmmx_King_Skin pattern) — mods whose pck has no standard skin paths but
+            // whose DLL patches CharacterModel / NCharacterSelectButton / spine types. Auto-suggests
+            // a base character via byte-frequency, writes assignments to skin_choices.json, then
+            // shows a single restart modal so v0.7.0 DLL block can take effect on next boot.
+            var alreadyDetectedIds = detected.Select(d => d.ModId).ToList();
+            DllSkinDetectionService.ScheduleAfter(tree, modsDir, choicesPath, managerDataDir, baseCharacters, alreadyDetectedIds);
+        }
     }
 
     private static ChoicesFileWatcher? _watcher;

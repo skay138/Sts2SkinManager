@@ -45,6 +45,15 @@ public class SkinChoicesConfig
     // Stale entries (mods no longer detected) get pruned in SyncAliases.
     public Dictionary<string, string> Aliases { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
+    // DLL-driven character skins (Hcxmmx_King_Skin pattern). modId → base character id.
+    // SkinModScanner injects these as Character variants even though their pck has no
+    // animations/characters/{base}/ paths. Populated by HarmonyPatchInspector + user confirmation.
+    public Dictionary<string, string> DllSkinAssignments { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    // Mods the user explicitly marked as "not a character skin" — silenced from future detection
+    // prompts so the modal doesn't re-pop on every boot.
+    public HashSet<string> DllSkinSkipped { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         WriteIndented = true,
@@ -97,6 +106,20 @@ public class SkinChoicesConfig
                 root.Remove("_aliases");
             }
 
+            if (root.TryGetPropertyValue("_dll_skin_assignments", out var dllAssignNode) && dllAssignNode != null)
+            {
+                var deserialized = JsonSerializer.Deserialize<Dictionary<string, string>>(dllAssignNode.ToJsonString(), JsonOpts);
+                if (deserialized != null) cfg.DllSkinAssignments = new Dictionary<string, string>(deserialized, StringComparer.OrdinalIgnoreCase);
+                root.Remove("_dll_skin_assignments");
+            }
+
+            if (root.TryGetPropertyValue("_dll_skin_skipped", out var dllSkipNode) && dllSkipNode != null)
+            {
+                var deserialized = JsonSerializer.Deserialize<List<string>>(dllSkipNode.ToJsonString(), JsonOpts);
+                if (deserialized != null) cfg.DllSkinSkipped = new HashSet<string>(deserialized, StringComparer.OrdinalIgnoreCase);
+                root.Remove("_dll_skin_skipped");
+            }
+
             root.Remove("_preview_visible"); // legacy v0.4.0-dev key, ignored
 
             cfg.Characters = JsonSerializer.Deserialize<Dictionary<string, CharacterSkinChoice>>(root.ToJsonString(), JsonOpts) ?? new(StringComparer.OrdinalIgnoreCase);
@@ -132,6 +155,18 @@ public class SkinChoicesConfig
         {
             var aliasNode = JsonNode.Parse(JsonSerializer.Serialize(Aliases, JsonOpts));
             if (aliasNode != null) root["_aliases"] = aliasNode;
+        }
+
+        if (DllSkinAssignments.Count > 0)
+        {
+            var node = JsonNode.Parse(JsonSerializer.Serialize(DllSkinAssignments, JsonOpts));
+            if (node != null) root["_dll_skin_assignments"] = node;
+        }
+
+        if (DllSkinSkipped.Count > 0)
+        {
+            var node = JsonNode.Parse(JsonSerializer.Serialize(DllSkinSkipped.ToList(), JsonOpts));
+            if (node != null) root["_dll_skin_skipped"] = node;
         }
 
         var json = root.ToJsonString(JsonOpts);
