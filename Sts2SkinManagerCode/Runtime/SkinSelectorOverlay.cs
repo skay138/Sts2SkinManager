@@ -274,7 +274,8 @@ public static class SkinSelectorOverlay
             ApplyPreviewVisibility();
             RefreshItems();
 
-            if (_cardMods.Count > 0 || _mixedMods.Count > 0) BuildAccordionPanel(screen);
+            var hasCharacterVariants = _byCharacter != null && _byCharacter.Values.Any(v => v.Count > 0);
+            if (_cardMods.Count > 0 || _mixedMods.Count > 0 || hasCharacterVariants) BuildAccordionPanel(screen);
 
             EnsureLocaleSubscribed();
         }
@@ -595,17 +596,29 @@ public static class SkinSelectorOverlay
         PositionAccordion(vbox);
         _accordionVBox = vbox;
 
-        // Top row — toggle (compact) + Save / Discard always visible alongside.
+        // Tabs are only useful when card-skin or mixed-addon mods exist. When the panel is shown
+        // purely for character-skin variant changes, skip the outer toggle + TabContainer entirely
+        // and just expose Save / Discard.
+        var hasTabContent = _cardMods.Count > 0 || _mixedMods.Count > 0;
+
+        // Top row — toggle (compact, only when there are tabs) + Save / Discard.
         var topRow = new HBoxContainer { CustomMinimumSize = new Vector2(480, 36) };
 
-        var outerToggle = new Button
+        if (hasTabContent)
         {
-            CustomMinimumSize = new Vector2(220, 36),
-            Alignment = HorizontalAlignment.Left,
-        };
-        _outerToggleBtn = outerToggle;
-        outerToggle.Pressed += ToggleOuterExpanded;
-        topRow.AddChild(outerToggle);
+            var outerToggle = new Button
+            {
+                CustomMinimumSize = new Vector2(220, 36),
+                Alignment = HorizontalAlignment.Left,
+            };
+            _outerToggleBtn = outerToggle;
+            outerToggle.Pressed += ToggleOuterExpanded;
+            topRow.AddChild(outerToggle);
+        }
+        else
+        {
+            _outerToggleBtn = null;
+        }
 
         var saveBtn = new Button { Text = Strings.Get("save_changes"), CustomMinimumSize = new Vector2(120, 36) };
         _cardPackSaveBtn = saveBtn;
@@ -619,20 +632,29 @@ public static class SkinSelectorOverlay
 
         vbox.AddChild(topRow);
 
-        // Body wraps just the tabs — collapsed by default so the screen stays clean.
-        var body = new VBoxContainer { CustomMinimumSize = new Vector2(480, 0) };
-        _outerBody = body;
-        vbox.AddChild(body);
-
-        // Tabs — taller now since the outer toggle gives us screen budget when expanded.
-        var tabs = new TabContainer { CustomMinimumSize = new Vector2(480, 400) };
-        _tabContainer = tabs;
-        body.AddChild(tabs);
-
         _cardPackTabIndex = -1;
         _mixedTabIndex = -1;
 
-        if (_cardMods.Count > 0)
+        TabContainer? tabs = null;
+        if (hasTabContent)
+        {
+            // Body wraps just the tabs — collapsed by default so the screen stays clean.
+            var body = new VBoxContainer { CustomMinimumSize = new Vector2(480, 0) };
+            _outerBody = body;
+            vbox.AddChild(body);
+
+            // Tabs — taller now since the outer toggle gives us screen budget when expanded.
+            tabs = new TabContainer { CustomMinimumSize = new Vector2(480, 400) };
+            _tabContainer = tabs;
+            body.AddChild(tabs);
+        }
+        else
+        {
+            _outerBody = null;
+            _tabContainer = null;
+        }
+
+        if (tabs != null && _cardMods.Count > 0)
         {
             var cardTab = new VBoxContainer { Name = "CardSkinTab" };
             var cardScroll = new ScrollContainer
@@ -653,7 +675,7 @@ public static class SkinSelectorOverlay
             BuildCardPackRows();
         }
 
-        if (_mixedMods.Count > 0)
+        if (tabs != null && _mixedMods.Count > 0)
         {
             var mixedTab = new VBoxContainer { Name = "MixedAddonTab" };
 

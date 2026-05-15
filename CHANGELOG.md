@@ -4,6 +4,14 @@ All notable changes to Sts2SkinManager are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.5] - 2026-05-15
+
+### Fixed
+- **Save / Discard panel now appears for character-skin-only setups.** Previously the panel that hosts the Save and Discard buttons was only built when the user had at least one card-skin or mixed-addon mod installed (`SkinSelectorOverlay.cs:277`). Users with only character-skin mods could change the active variant from the dropdown but had no way to commit it — the dirty mark would appear on the dropdown label, but no Save button was visible. The panel is now also built when any character has at least one detected variant.
+
+### Changed
+- **Empty TabContainer no longer appears for character-skin-only setups.** When the Save/Discard panel is shown purely because of character-skin variants (no card-skin or mixed-addon mods present), the outer expand/collapse toggle and the empty TabContainer are skipped entirely. Only Save and Discard buttons are placed in the top row, keeping the character select screen clean. Existing setups with card-skin or mixed-addon mods are unaffected.
+
 ## [0.11.4] - 2026-05-15
 
 ### Changed — character suggestion algorithm rewrite
